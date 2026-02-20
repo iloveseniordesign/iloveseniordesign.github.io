@@ -1,10 +1,375 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>ELO Leaderboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Pong ELO Leaderboard</title>
+    <style>
+        :root {
+            --table-green: #0b4a2e;
+            --table-green-light: #167a4e;
+            --ball-orange: #ff6b00;
+            --ball-orange-glow: #ff8c3a;
+            --dark-bg: #121212;
+            --panel-bg: #1e1e1e;
+            --text-light: #e0e0e0;
+            --border-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-light);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 3px solid var(--table-green);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--text-light);
+            font-size: 2.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        h1 span {
+            color: var(--ball-orange);
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            border-top: 4px solid var(--table-green-light);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--table-green-light);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        /* Leaderboard Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: var(--table-green);
+            color: white;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+
+        tr:nth-child(even) {
+            background-color: rgba(255,255,255,0.03);
+        }
+
+        tr:hover {
+            background-color: rgba(255, 107, 0, 0.1);
+        }
+
+        .rank-1 {
+            color: var(--ball-orange);
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            background-color: var(--dark-bg);
+            color: var(--text-light);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--ball-orange);
+            box-shadow: 0 0 5px var(--ball-orange-glow);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--ball-orange);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background-color: var(--ball-orange-glow);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .vs {
+            text-align: center;
+            font-weight: bold;
+            color: var(--table-green-light);
+            margin: 10px 0;
+        }
+
+    </style>
 </head>
 <body>
-  <h1>My ELO Leaderboard</h1>
-  <p>It works.</p>
+
+    <div class="container">
+        <header>
+            <h1>🏓 Smash<span>Rank</span></h1>
+            <p>Official Table Tennis ELO Leaderboard</p>
+        </header>
+
+        <div class="panel">
+            <h2>Top Players</h2>
+            <table id="leaderboard">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>ELO</th>
+                        <th>W - L</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="controls">
+            <div class="panel" style="margin-bottom: 20px;">
+                <h2>Add Player</h2>
+                <form id="add-player-form">
+                    <div class="form-group">
+                        <label for="player-name">Name</label>
+                        <input type="text" id="player-name" required placeholder="e.g. Ma Long">
+                    </div>
+                    <div class="form-group">
+                        <label for="initial-elo">Starting ELO (Default 1200)</label>
+                        <input type="number" id="initial-elo" value="1200" required>
+                    </div>
+                    <button type="submit">Register Player</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <h2>Log Match Result</h2>
+                <form id="log-match-form">
+                    <div class="form-group">
+                        <label for="winner-select">Winner 🏆</label>
+                        <select id="winner-select" required>
+                            <option value="">Select Winner...</option>
+                        </select>
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="form-group">
+                        <label for="loser-select">Loser 💀</label>
+                        <select id="loser-select" required>
+                            <option value="">Select Loser...</option>
+                        </select>
+                    </div>
+                    <button type="submit">Update Ratings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let players = [];
+        const K_FACTOR = 32;
+
+        // DOM Elements
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        const addPlayerForm = document.getElementById('add-player-form');
+        const logMatchForm = document.getElementById('log-match-form');
+        const winnerSelect = document.getElementById('winner-select');
+        const loserSelect = document.getElementById('loser-select');
+
+        // Initialize App
+        function init() {
+            // Load from local storage if available
+            const savedPlayers = localStorage.getItem('pingPongPlayers');
+            if (savedPlayers) {
+                players = JSON.parse(savedPlayers);
+            } else {
+                // Add some dummy data if empty
+                players = [
+                    { id: 1, name: "Forrest Gump", elo: 1500, wins: 5, losses: 0 },
+                    { id: 2, name: "King Kong", elo: 1150, wins: 1, losses: 3 },
+                    { id: 3, name: "Jane Doe", elo: 1250, wins: 2, losses: 1 }
+                ];
+                saveData();
+            }
+            updateUI();
+        }
+
+        // Calculate standard ELO
+        function calculateNewElo(ratingA, ratingB, actualScoreA) {
+            const expectedScoreA = 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
+            return Math.round(ratingA + K_FACTOR * (actualScoreA - expectedScoreA));
+        }
+
+        // Add a new player
+        addPlayerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('player-name').value.trim();
+            const eloInput = parseInt(document.getElementById('initial-elo').value);
+
+            if (nameInput === '') return alert("Please enter a name.");
+
+            const newPlayer = {
+                id: Date.now(),
+                name: nameInput,
+                elo: eloInput,
+                wins: 0,
+                losses: 0
+            };
+
+            players.push(newPlayer);
+            saveData();
+            updateUI();
+            addPlayerForm.reset();
+            document.getElementById('initial-elo').value = 1200; // reset default
+        });
+
+        // Log a match
+        logMatchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const winnerId = parseInt(winnerSelect.value);
+            const loserId = parseInt(loserSelect.value);
+
+            if (winnerId === loserId) {
+                return alert("A player cannot play against themselves!");
+            }
+
+            const winner = players.find(p => p.id === winnerId);
+            const loser = players.find(p => p.id === loserId);
+
+            if (winner && loser) {
+                // Calculate new ELOs
+                const newWinnerElo = calculateNewElo(winner.elo, loser.elo, 1);
+                const newLoserElo = calculateNewElo(loser.elo, winner.elo, 0);
+
+                // Update stats
+                winner.elo = newWinnerElo;
+                winner.wins += 1;
+                
+                loser.elo = newLoserElo;
+                loser.losses += 1;
+
+                saveData();
+                updateUI();
+                logMatchForm.reset();
+            }
+        });
+
+        // Update the UI (Leaderboard & Dropdowns)
+        function updateUI() {
+            // Sort players by ELO descending
+            players.sort((a, b) => b.elo - a.elo);
+
+            // Render Leaderboard
+            leaderboardBody.innerHTML = '';
+            players.forEach((player, index) => {
+                const tr = document.createElement('tr');
+                const rankClass = index === 0 ? 'rank-1' : '';
+                const rankDisplay = index === 0 ? '👑 1' : index + 1;
+                
+                tr.innerHTML = `
+                    <td class="${rankClass}">${rankDisplay}</td>
+                    <td class="${rankClass}">${player.name}</td>
+                    <td class="${rankClass}">${player.elo}</td>
+                    <td>${player.wins} - ${player.losses}</td>
+                `;
+                leaderboardBody.appendChild(tr);
+            });
+
+            // Render Select Dropdowns
+            winnerSelect.innerHTML = '<option value="">Select Winner...</option>';
+            loserSelect.innerHTML = '<option value="">Select Loser...</option>';
+            
+            // Sort alphabetically for dropdowns
+            const sortedByName = [...players].sort((a, b) => a.name.localeCompare(b.name));
+            
+            sortedByName.forEach(player => {
+                const optionW = document.createElement('option');
+                optionW.value = player.id;
+                optionW.textContent = `${player.name} (${player.elo})`;
+                winnerSelect.appendChild(optionW);
+
+                const optionL = document.createElement('option');
+                optionL.value = player.id;
+                optionL.textContent = `${player.name} (${player.elo})`;
+                loserSelect.appendChild(optionL);
+            });
+        }
+
+        function saveData() {
+            localStorage.setItem('pingPongPlayers', JSON.stringify(players));
+        }
+
+        // Run
+        init();
+    </script>
 </body>
 </html>
