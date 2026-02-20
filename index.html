@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;700;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
     <style>
         :root {
             --primary-orange: #ff8c00;
@@ -226,12 +228,13 @@
         .action-buttons {
             display: flex;
             gap: 5px;
-            margin-top: 5px;
+            flex-shrink: 0;
+            align-items: center;
         }
 
         .btn-small {
-            flex: 1;
-            padding: 8px 12px;
+            flex: 0 0 auto;
+            padding: 8px 16px;
             font-size: 0.8rem;
             cursor: pointer;
             border: 1px solid var(--primary-orange);
@@ -240,6 +243,7 @@
             border-radius: 4px;
             transition: all 0.2s ease;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         .btn-small:hover {
@@ -274,16 +278,24 @@
         .match-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 10px;
+            align-items: flex-start;
+            padding: 15px;
             background-color: rgba(255,255,255,0.02);
             border: 1px solid var(--border-color);
             border-radius: 6px;
             margin: 8px 0;
+            gap: 15px;
         }
 
         .match-info {
             flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .match-info div {
+            line-height: 1.4;
         }
 
     </style>
@@ -377,6 +389,20 @@
     </div>
 
     <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCHRQOLzC0DcuZv4aCqsL4EM_IVthiZSIc",
+            authDomain: "tttiw-6d44e.firebaseapp.com",
+            projectId: "tttiw-6d44e",
+            storageBucket: "tttiw-6d44e.firebasestorage.app",
+            messagingSenderId: "902138155809",
+            appId: "1:902138155809:web:0860c66b77d07746952460"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         // State management
         let players = [];
         let actionLog = [];
@@ -392,34 +418,24 @@
         const playersListContainer = document.getElementById('players-list');
 
         // Initialize App
-        function init() {
-            // Load from local storage if available
-            const savedPlayers = localStorage.getItem('pingPongPlayers');
-            const savedActionLog = localStorage.getItem('actionLog');
-            
-            if (savedPlayers) {
-                players = JSON.parse(savedPlayers);
-            } else {
-                // Add some dummy data if empty
-                players = [
-                    { id: 1, name: "Forrest Gump", elo: 1500, wins: 5, losses: 0 },
-                    { id: 2, name: "King Kong", elo: 1150, wins: 1, losses: 3 },
-                    { id: 3, name: "Jane Doe", elo: 1250, wins: 2, losses: 1 }
-                ];
-                // Create actions for initial players
-                actionLog = [
-                    { id: Date.now() - 3000, type: 'player_added', playerName: 'Forrest Gump', playerId: 1, initialElo: 1500, date: new Date(Date.now() - 3000).toLocaleString() },
-                    { id: Date.now() - 2000, type: 'player_added', playerName: 'King Kong', playerId: 2, initialElo: 1150, date: new Date(Date.now() - 2000).toLocaleString() },
-                    { id: Date.now() - 1000, type: 'player_added', playerName: 'Jane Doe', playerId: 3, initialElo: 1250, date: new Date(Date.now() - 1000).toLocaleString() }
-                ];
-                saveData();
-            }
+        async function init() {
+            try {
+                // Load players from Firestore
+                const playersSnapshot = await db.collection('players').get();
+                players = playersSnapshot.docs.map(doc => doc.data());
 
-            if (savedActionLog) {
-                actionLog = JSON.parse(savedActionLog);
+                // Load action log from Firestore
+                const actionLogSnapshot = await db.collection('actionLog').orderBy('timestamp', 'asc').get();
+                actionLog = actionLogSnapshot.docs.map(doc => ({
+                    ...doc.data(),
+                    id: doc.data().id
+                }));
+
+                updateUI();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Error connecting to database. Check your Firebase config.');
             }
-            
-            updateUI();
         }
 
         // Calculate standard ELO
@@ -429,7 +445,7 @@
         }
 
         // Add a new player
-        addPlayerForm.addEventListener('submit', (e) => {
+        addPlayerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const nameInput = document.getElementById('player-name').value.trim();
             const eloInput = parseInt(document.getElementById('initial-elo').value);
@@ -437,7 +453,7 @@
             if (nameInput === '') return alert("Please enter a name.");
 
             const newPlayer = {
-                id: Date.now(),
+                id: Date.now().toString(),
                 name: nameInput,
                 elo: eloInput,
                 wins: 0,
@@ -445,10 +461,11 @@
             };
 
             players.push(newPlayer);
+            const newActionId = Date.now() + Math.random();
             
             // Log action
             actionLog.push({
-                id: Date.now(),
+                id: newActionId,
                 type: 'player_added',
                 playerName: nameInput,
                 playerId: newPlayer.id,
@@ -456,17 +473,17 @@
                 date: new Date().toLocaleString()
             });
             
-            saveData();
+            await saveData();
             updateUI();
             addPlayerForm.reset();
             document.getElementById('initial-elo').value = 1200; // reset default
         });
 
         // Log a match
-        logMatchForm.addEventListener('submit', (e) => {
+        logMatchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const winnerId = parseInt(winnerSelect.value);
-            const loserId = parseInt(loserSelect.value);
+            const winnerId = winnerSelect.value;
+            const loserId = loserSelect.value;
 
             if (winnerId === loserId) {
                 return alert("A player cannot play against themselves!");
@@ -490,8 +507,9 @@
                 loser.losses += 1;
 
                 // Log action
+                const newActionId = Date.now() + Math.random();
                 actionLog.push({
-                    id: Date.now(),
+                    id: newActionId,
                     type: 'match_result',
                     winner: winner.name,
                     loser: loser.name,
@@ -504,7 +522,7 @@
                     date: new Date().toLocaleString()
                 });
 
-                saveData();
+                await saveData();
                 updateUI();
                 logMatchForm.reset();
             }
@@ -555,9 +573,25 @@
             displayPlayersList();
         }
 
-        function saveData() {
-            localStorage.setItem('pingPongPlayers', JSON.stringify(players));
-            localStorage.setItem('actionLog', JSON.stringify(actionLog));
+        async function saveData() {
+            try {
+                // Save players to Firestore
+                players.forEach(player => {
+                    db.collection('players').doc(player.id).set(player);
+                });
+
+                // Save action log to Firestore
+                actionLog.forEach(action => {
+                    const actionData = {
+                        ...action,
+                        timestamp: new Date()
+                    };
+                    db.collection('actionLog').doc(action.id.toString()).set(actionData);
+                });
+            } catch (error) {
+                console.error('Error saving data:', error);
+                alert('Error saving to database');
+            }
         }
 
         // Display Action Log
@@ -683,7 +717,7 @@
         }
         
         // Delete an action and revert changes
-        function deleteAction(actionId) {
+        async function deleteAction(actionId) {
             if (!confirm('Are you sure you want to remove this action?')) return;
             
             const actionIndex = actionLog.findIndex(a => a.id === actionId);
@@ -696,7 +730,10 @@
                 const playerIndex = players.findIndex(p => p.id === action.playerId);
                 if (playerIndex !== -1) {
                     players.splice(playerIndex, 1);
+                    await db.collection('players').doc(action.playerId).delete();
                 }
+                // Also remove all matches involving this player
+                actionLog = actionLog.filter(a => !(a.type === 'match_result' && (a.winnerId === action.playerId || a.loserId === action.playerId)));
             } else if (action.type === 'player_removed') {
                 // Restore the player
                 const playerIndex = players.findIndex(p => p.id === action.playerId);
@@ -712,21 +749,23 @@
             }
             
             actionLog.splice(actionIndex, 1);
+            await db.collection('actionLog').doc(action.id.toString()).delete();
             recalculatePlayerStats();
-            saveData();
+            await saveData();
             updateUI();
         }
 
         // Remove a player
-        function removePlayer(playerId) {
+        async function removePlayer(playerId) {
             if (!confirm('Are you sure you want to remove this player? This action will be logged.')) return;
             
             const player = players.find(p => p.id === playerId);
             if (!player) return;
             
             // Log the removal
+            const newActionId = Date.now() + Math.random();
             actionLog.push({
-                id: Date.now(),
+                id: newActionId,
                 type: 'player_removed',
                 playerName: player.name,
                 playerId: player.id,
@@ -736,13 +775,18 @@
                 date: new Date().toLocaleString()
             });
             
+            // Remove all matches involving this player
+            actionLog = actionLog.filter(a => !(a.type === 'match_result' && (a.winnerId === playerId || a.loserId === playerId)));
+            
             // Remove the player
             const playerIndex = players.findIndex(p => p.id === playerId);
             if (playerIndex !== -1) {
                 players.splice(playerIndex, 1);
+                await db.collection('players').doc(playerId).delete();
             }
             
-            saveData();
+            recalculatePlayerStats();
+            await saveData();
             updateUI();
         }
 
