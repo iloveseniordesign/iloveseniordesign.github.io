@@ -6,7 +6,7 @@
     <title>TTTIW - Table Tennis Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-orange: #ff8c00;
@@ -14,14 +14,14 @@
             --accent-orange: #ffa500;
             --dark-bg: #0a0a0a;
             --panel-bg: #151515;
-            --text-light: #ffffff;
-            --text-secondary: #b0b0b0;
+            --text-light: #e8e8e8;
+            --text-secondary: #999999;
             --border-color: #ff8c00;
             --border-color-accent: #1a1a1a;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--dark-bg);
             background-image: linear-gradient(135deg, #0a0a0a 0%, #1a0a00 100%);
             color: var(--text-light);
@@ -29,6 +29,30 @@
             padding: 20px;
             display: flex;
             justify-content: center;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-orange);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-orange);
+        }
+
+        /* Firefox Scrollbar */
+        * {
+            scrollbar-color: var(--primary-orange) rgba(0, 0, 0, 0.3);
+            scrollbar-width: thin;
         }
 
         .container {
@@ -309,15 +333,6 @@
                 </form>
             </div>
         </div>
-
-        <div class="panel">
-            <h2>📋 Action Log</h2>
-            <div id="action-log-container" style="max-height: 500px; overflow-y: auto;">
-                <p style="color: #888; text-align: center;">No actions recorded yet</p>
-            </div>
-        </div>
-
-        <div class="controls">
             <div class="panel" style="margin-bottom: 20px;">
                 <h2>Add Player</h2>
                 <form id="add-player-form">
@@ -350,27 +365,15 @@
                     <li><strong>Fairness:</strong> Beating stronger players gains more ELO</li>
                 </ul>
             </div>
-
-            <div class="panel">
-                <h2>Log Match Result</h2>
-                <form id="log-match-form">
-                    <div class="form-group">
-                        <label for="winner-select">Winner 🏆</label>
-                        <select id="winner-select" required>
-                            <option value="">Select Winner...</option>
-                        </select>
-                    </div>
-                    <div class="vs">VS</div>
-                    <div class="form-group">
-                        <label for="loser-select">Loser 💀</label>
-                        <select id="loser-select" required>
-                            <option value="">Select Loser...</option>
-                        </select>
-                    </div>
-                    <button type="submit">Update Ratings</button>
-                </form>
-            </div>
         </div>
+    </div>
+
+    <div class="panel">
+        <h2>📋 Action Log</h2>
+        <div id="action-log-container" style="max-height: 500px; overflow-y: auto;">
+            <p style="color: #888; text-align: center;">No actions recorded yet</p>
+        </div>
+    </div>
     </div>
 
     <script>
