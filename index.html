@@ -28,9 +28,21 @@
             background-image: linear-gradient(135deg, #0a0a0a 0%, #1a0a00 100%);
             color: var(--text-light);
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 8px;
+            }
         }
 
         /* Custom Scrollbar */
@@ -65,30 +77,64 @@
             gap: 20px;
         }
 
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1.5fr 1fr;
+                gap: 15px;
+            }
+        }
+
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                gap: 12px;
             }
         }
 
         header {
             grid-column: 1 / -1;
             text-align: center;
-            padding: 30px 0;
+            padding: 25px 0;
             border-bottom: 3px solid var(--primary-orange);
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             background: linear-gradient(180deg, transparent 0%, rgba(255, 140, 0, 0.1) 100%);
+        }
+
+        @media (max-width: 768px) {
+            header {
+                padding: 20px 0;
+                margin-bottom: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 15px 0;
+                margin-bottom: 15px;
+            }
         }
 
         h1 {
             margin: 0;
             color: var(--primary-orange);
-            font-size: 3rem;
+            font-size: clamp(2rem, 8vw, 3rem);
             text-transform: uppercase;
-            letter-spacing: 4px;
+            letter-spacing: 2px;
             font-weight: 800;
             text-shadow: 0 0 20px rgba(255, 140, 0, 0.5);
             font-family: 'Oxanium', sans-serif;
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                letter-spacing: 1px;
+            }
         }
 
         h1 span {
@@ -105,19 +151,33 @@
         .panel {
             background-color: var(--panel-bg);
             border-radius: 8px;
-            padding: 25px;
+            padding: 20px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,140,0,0.1);
             border: 1px solid rgba(255, 140, 0, 0.2);
             border-left: 4px solid var(--primary-orange);
+        }
+
+        @media (max-width: 768px) {
+            .panel {
+                padding: 15px;
+                border-radius: 6px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .panel {
+                padding: 12px;
+                border-radius: 4px;
+            }
         }
 
         h2 {
             margin-top: 0;
             color: var(--primary-orange);
             border-bottom: 2px solid rgba(255, 140, 0, 0.3);
-            padding-bottom: 12px;
-            font-size: 1.1rem;
-            letter-spacing: 1px;
+            padding-bottom: 10px;
+            font-size: clamp(0.95rem, 4vw, 1.1rem);
+            letter-spacing: 0.5px;
             font-family: 'Oxanium', sans-serif;
             font-weight: 700;
         }
@@ -130,17 +190,24 @@
         }
 
         th, td {
-            padding: 12px 15px;
+            padding: 10px 12px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
+            font-size: clamp(0.8rem, 2.5vw, 0.95rem);
+        }
+
+        @media (max-width: 480px) {
+            th, td {
+                padding: 8px 6px;
+            }
         }
 
         th {
             background-color: var(--primary-orange);
             color: #000;
             text-transform: uppercase;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
+            font-size: clamp(0.7rem, 2.5vw, 0.9rem);
+            letter-spacing: 0.5px;
             font-weight: 700;
         }
 
@@ -164,10 +231,16 @@
             margin-bottom: 15px;
         }
 
+        @media (max-width: 480px) {
+            .form-group {
+                margin-bottom: 12px;
+            }
+        }
+
         label {
             display: block;
             margin-bottom: 5px;
-            font-size: 0.9rem;
+            font-size: clamp(0.8rem, 3vw, 0.9rem);
             color: #aaa;
         }
 
@@ -179,8 +252,15 @@
             color: var(--text-light);
             border-radius: 6px;
             box-sizing: border-box;
-            font-size: 1rem;
+            font-size: clamp(0.9rem, 4vw, 1rem);
             transition: all 0.3s ease;
+        }
+
+        @media (max-width: 480px) {
+            input, select {
+                padding: 14px 10px;
+                font-size: 16px;
+            }
         }
 
         input:focus, select:focus {
@@ -197,13 +277,20 @@
             color: #000;
             border: none;
             border-radius: 6px;
-            font-size: 1rem;
+            font-size: clamp(0.85rem, 3vw, 1rem);
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s ease;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);
+        }
+
+        @media (max-width: 480px) {
+            button {
+                padding: 14px 12px;
+                font-size: 0.9rem;
+            }
         }
 
         button:hover {
@@ -220,9 +307,9 @@
             text-align: center;
             font-weight: bold;
             color: var(--primary-orange);
-            margin: 15px 0;
-            font-size: 1.1rem;
-            letter-spacing: 2px;
+            margin: 12px 0;
+            font-size: clamp(0.95rem, 3vw, 1.1rem);
+            letter-spacing: 1px;
         }
 
         .action-buttons {
@@ -234,7 +321,7 @@
         .btn-small {
             flex: 1;
             padding: 8px 12px;
-            font-size: 0.8rem;
+            font-size: clamp(0.7rem, 2.5vw, 0.8rem);
             cursor: pointer;
             border: 1px solid var(--primary-orange);
             background-color: rgba(255, 140, 0, 0.15);
@@ -242,6 +329,17 @@
             border-radius: 4px;
             transition: all 0.2s ease;
             font-weight: 600;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 480px) {
+            .btn-small {
+                padding: 10px 8px;
+                min-height: 36px;
+            }
         }
 
         .btn-small:hover {
@@ -282,10 +380,31 @@
             border: 1px solid var(--border-color);
             border-radius: 6px;
             margin: 8px 0;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 480px) {
+            .match-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
         }
 
         .match-info {
             flex-grow: 1;
+            min-width: 0;
+        }
+
+        .action-buttons {
+            width: 100%;
+        }
+
+        @media (min-width: 481px) {
+            .action-buttons {
+                width: auto;
+            }
         }
 
     </style>
@@ -358,7 +477,7 @@
             </div>
 
             <div class="panel">
-                <h2>� Rules</h2>
+                <h2>⚙️ Rules</h2>
                 <ul class="rules-list">
                     <li><strong>Best of 1:</strong> Single match format</li>
                     <li><strong>ELO Rating:</strong> Based on opponent strength and match outcome</li>
@@ -368,14 +487,13 @@
                 </ul>
             </div>
         </div>
-    </div>
 
-    <div class="panel">
-        <h2>📋 Action Log</h2>
-        <div id="action-log-container" style="max-height: 500px; overflow-y: auto;">
-            <p style="color: #888; text-align: center;">No actions recorded yet</p>
+        <div class="panel" style="grid-column: 1 / -1;">
+            <h2>📋 Action Log</h2>
+            <div id="action-log-container" style="max-height: 500px; overflow-y: auto;">
+                <p style="color: #888; text-align: center;">No actions recorded yet</p>
+            </div>
         </div>
-    </div>
     </div>
 
     <script>
