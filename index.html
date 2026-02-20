@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TTTIW - Table Tennis Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-orange: #ff8c00;
@@ -18,7 +21,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', sans-serif;
             background-color: var(--dark-bg);
             background-image: linear-gradient(135deg, #0a0a0a 0%, #1a0a00 100%);
             color: var(--text-light);
@@ -57,8 +60,9 @@
             font-size: 3rem;
             text-transform: uppercase;
             letter-spacing: 4px;
-            font-weight: 900;
+            font-weight: 800;
             text-shadow: 0 0 20px rgba(255, 140, 0, 0.5);
+            font-family: 'Oxanium', sans-serif;
         }
 
         h1 span {
@@ -88,6 +92,8 @@
             padding-bottom: 12px;
             font-size: 1.1rem;
             letter-spacing: 1px;
+            font-family: 'Oxanium', sans-serif;
+            font-weight: 700;
         }
 
         /* Leaderboard Table Styles */
@@ -263,7 +269,7 @@
     <div class="container">
         <header>
             <h1>🏓 TTTIW</h1>
-            <p>Table Tennis Tracker & Innovation Worldwide</p>
+            <p>Table Tennis Texas InventionWorks</p>
         </header>
 
         <div class="panel">
@@ -643,20 +649,30 @@
                 }
             });
             
-            // Replay all match_result actions in order
+            // Replay all match_result actions in order and update action log with recalculated values
             actionLog.forEach(action => {
                 if (action.type === 'match_result') {
                     const winner = players.find(p => p.id === action.winnerId);
                     const loser = players.find(p => p.id === action.loserId);
                     
                     if (winner && loser) {
-                        winner.wins += 1;
-                        loser.losses += 1;
+                        // Store old ELOs before update
+                        action.oldWinnerElo = winner.elo;
+                        action.oldLoserElo = loser.elo;
                         
+                        // Calculate new ELOs
                         const newWinnerElo = calculateNewElo(winner.elo, loser.elo, 1);
                         const newLoserElo = calculateNewElo(loser.elo, winner.elo, 0);
                         
+                        // Update action log with recalculated values
+                        action.newWinnerElo = newWinnerElo;
+                        action.newLoserElo = newLoserElo;
+                        
+                        // Update player stats
+                        winner.wins += 1;
                         winner.elo = newWinnerElo;
+                        
+                        loser.losses += 1;
                         loser.elo = newLoserElo;
                     }
                 }
