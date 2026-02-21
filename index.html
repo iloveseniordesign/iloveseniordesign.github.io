@@ -749,8 +749,9 @@
                         <div class="match-info">
                             <div><span style="color: #ff4444; font-weight: bold;">❌ Player:</span> <strong>${action.playerName}</strong> removed (${action.wins}W - ${action.losses}L)</div>
                             <div style="font-size: 0.75rem; color: #666;">${action.date}</div>
-                        </div>
-                        <div class="action-buttons">
+               Sort by timestamp, then display in reverse chronological order (newest first)
+            const sortedLog = [...actionLog].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).reverse();
+            sortedLogaction-buttons">
                             <button class="btn-small btn-delete" onclick="deleteAction('${action.id}')">Remove</button>
                         </div>
                     `;
