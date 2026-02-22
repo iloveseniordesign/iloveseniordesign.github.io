@@ -1,279 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TTTIW - Table Tennis Tracker</title>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-<style>
-/* ... keep all your previous styles ... */
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTTIW - Table Tennis Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-<div class="container">
-<header>
-<h1>🏓 TTTIW</h1>
-<p>Table Tennis Texas InventionWorks</p>
-</header>
 
-<div class="panel">
-<h2>Top Players</h2>
-<table id="leaderboard">
-<thead>
-<tr>
-<th>Rank</th>
-<th>Player</th>
-<th>ELO</th>
-<th>W - L</th>
-</tr>
-</thead>
-<tbody id="leaderboard-body"></tbody>
-</table>
-</div>
+    <div class="container">
+        <header>
+            <h1>🏓 TTTIW</h1>
+            <p>Table Tennis Texas InventionWorks</p>
+        </header>
 
-<div class="controls">
-<div class="panel">
-<h2>Log Match Result</h2>
-<form id="log-match-form">
-<div class="form-group">
-<label for="winner-select">Winner 🏆</label>
-<select id="winner-select" required>
-<option value="">Select Winner...</option>
-</select>
-</div>
-<div class="vs">VS</div>
-<div class="form-group">
-<label for="loser-select">Loser 💀</label>
-<select id="loser-select" required>
-<option value="">Select Loser...</option>
-</select>
-</div>
-<button type="submit">Update Ratings</button>
-</form>
-</div>
-</div>
+        <div class="panel">
+            <h2>Top Players</h2>
+            <table id="leaderboard">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>ELO</th>
+                        <th>W - L</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body"></tbody>
+            </table>
+        </div>
 
-<div class="panel" style="margin-bottom: 20px;">
-<h2>Add Player</h2>
-<form id="add-player-form">
-<div class="form-group">
-<label for="player-name">Name</label>
-<input type="text" id="player-name" required placeholder="e.g. Ma Long">
-</div>
-<div class="form-group">
-<label for="initial-elo">Starting ELO (Default 1500)</label>
-<input type="number" id="initial-elo" value="1500" required>
-</div>
-<button type="submit">Register Player</button>
-</form>
-</div>
+        <div class="controls">
+            <div class="panel">
+                <h2>Log Match Result</h2>
+                <form id="log-match-form">
+                    <div class="form-group">
+                        <label for="winner-select">Winner 🏆</label>
+                        <select id="winner-select" required>
+                            <option value="">Select Winner...</option>
+                        </select>
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="form-group">
+                        <label for="loser-select">Loser 💀</label>
+                        <select id="loser-select" required>
+                            <option value="">Select Loser...</option>
+                        </select>
+                    </div>
+                    <button type="submit">Update Ratings</button>
+                </form>
+            </div>
+        </div>
 
-<div class="panel">
-<h2>👥 Manage Players</h2>
-<div id="players-list" style="max-height: 250px; overflow-y: auto;">
-<p style="color: #888; text-align: center;">No players yet</p>
-</div>
-</div>
+        <div class="panel" style="margin-bottom: 20px;">
+            <h2>Add Player</h2>
+            <form id="add-player-form">
+                <div class="form-group">
+                    <label for="player-name">Name</label>
+                    <input type="text" id="player-name" required placeholder="e.g. Ma Long">
+                </div>
+                <div class="form-group">
+                    <label for="initial-elo">Starting ELO (Default 1500)</label>
+                    <input type="number" id="initial-elo" value="1500" required>
+                </div>
+                <button type="submit">Register Player</button>
+            </form>
+        </div>
 
-<div class="panel">
-<h2>📋 Action Log</h2>
-<div id="action-log-container" style="max-height: 500px; overflow-y: auto;">
-<p style="color: #888; text-align: center;">No actions recorded yet</p>
-</div>
-</div>
-</div>
+        <div class="panel">
+            <h2>👥 Manage Players</h2>
+            <div id="players-list" style="max-height: 250px; overflow-y: auto;">
+                <p style="color: #888; text-align: center;">No players yet</p>
+            </div>
+        </div>
 
-<script>
-const firebaseConfig = {
-apiKey: "AIzaSyCHRQOLzC0DcuZv4aCqsL4EM_IVthiZSIc",
-authDomain: "tttiw-6d44e.firebaseapp.com",
-projectId: "tttiw-6d44e",
-storageBucket: "tttiw-6d44e.firebasestorage.app",
-messagingSenderId: "902138155809",
-appId: "1:902138155809:web:0860c66b77d07746952460"
-};
+        <div class="panel">
+            <h2>📋 Action Log</h2>
+            <div id="action-log-container" style="max-height: 500px; overflow-y: auto;">
+                <p style="color: #888; text-align: center;">No actions recorded yet</p>
+            </div>
+        </div>
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+        <div class="panel">
+            <h2>⚙️ Rules</h2>
+            <ul class="rules-list">
+                <li><strong>First to 11:</strong> Win by reaching 11 points with a 2-point lead</li>
+                <li><strong>2 Serves Each:</strong> Players alternate with 2 serves per turn</li>
+                <li><strong>Deuce Serving:</strong> At 10-10 (deuce), alternate serves on each point</li>
+                <li><strong>Serve Height:</strong> Ball must be struck 6 inches above the table surface</li>
+                <li><strong>No Reserves:</strong> Must have a confirmed player, no substitutions allowed</li>
+                <li><strong>ELO Rating:</strong> Based on opponent strength and match outcome</li>
+                <li><strong>K-Factor:</strong> 32 points per match</li>
+                <li><strong>Starting Rating:</strong> 1200 ELO by default</li>
+                <li><strong>Fairness:</strong> Beating stronger players gains more ELO</li>
+            </ul>
+        </div>
 
-let players = [];
-let actionLog = [];
-const tau = 0.5; // Glicko-2 parameter
+    </div>
 
-const leaderboardBody = document.getElementById('leaderboard-body');
-const addPlayerForm = document.getElementById('add-player-form');
-const logMatchForm = document.getElementById('log-match-form');
-const winnerSelect = document.getElementById('winner-select');
-const loserSelect = document.getElementById('loser-select');
-const actionLogContainer = document.getElementById('action-log-container');
-const playersListContainer = document.getElementById('players-list');
-
-async function init() {
-    try {
-        const playersSnapshot = await db.collection('players').get();
-        players = playersSnapshot.docs.map(doc => doc.data());
-
-        const actionLogSnapshot = await db.collection('actionLog').orderBy('timestamp', 'asc').get();
-        actionLog = actionLogSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.data().id }));
-
-        updatePlayerRDs();
-        updateUI();
-    } catch (error) {
-        console.error('Error loading data:', error);
-        alert('Error connecting to database.');
-    }
-}
-
-// ---------------------
-// Glicko-2 Functions
-// ---------------------
-
-function g2Scale(r) {
-    return (r - 1500) / 173.717;
-}
-function g2Unscale(r) {
-    return r * 173.717 + 1500;
-}
-
-function g(RD) {
-    return 1 / Math.sqrt(1 + 3 * RD * RD / (Math.PI * Math.PI));
-}
-
-function E(r, rj, RDj) {
-    return 1 / (1 + Math.exp(-g(RDj) * (r - rj)));
-}
-
-// Core Glicko-2 update per player
-function calculateGlicko2(player, results) {
-    if (results.length === 0) return player;
-
-    let r = g2Scale(player.elo);
-    let RD = player.rd / 173.717;
-    let sigma = player.volatility;
-
-    let v = 0;
-    results.forEach(res => {
-        const rj = g2Scale(res.opponentRating);
-        const RDj = res.opponentRD / 173.717;
-        const Eij = E(r, rj, RDj);
-        v += g(RDj)**2 * Eij * (1 - Eij);
-    });
-    v = 1 / v;
-
-    let delta = 0;
-    results.forEach(res => {
-        const rj = g2Scale(res.opponentRating);
-        const RDj = res.opponentRD / 173.717;
-        const Eij = E(r, rj, RDj);
-        delta += g(RDj) * (res.outcome - Eij);
-    });
-    delta = v * delta;
-
-    // RD pre-update
-    const RDStar = Math.sqrt(RD*RD + sigma*sigma);
-
-    // Updated RD
-    const newRD = 1 / Math.sqrt(1 / (RDStar*RDStar) + 1 / v);
-
-    // Updated rating
-    const newR = r + newRD*newRD * delta;
-
-    player.elo = Math.round(g2Unscale(newR));
-    player.rd = Math.max(Math.round(newRD * 173.717), 50); // floor 50
-    player.volatility = sigma; // simplified
-
-    return player;
-}
-
-// ---------------------
-// RD decay over inactivity
-// ---------------------
-function calculateRD(lastMatchDate) {
-    if (!lastMatchDate) return 350;
-    const now = new Date();
-    const last = new Date(lastMatchDate);
-    const days = (now - last) / (1000*60*60*24);
-    return Math.min(350, 50 + days/10 * 50); // 50->350 over 10 days
-}
-function updatePlayerRDs() {
-    players.forEach(p => { p.rd = calculateRD(p.lastMatchDate); });
-}
-
-// ---------------------
-// Add Player
-// ---------------------
-addPlayerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('player-name').value.trim();
-    const elo = parseInt(document.getElementById('initial-elo').value);
-    if (!name) return alert("Enter name");
-
-    const newPlayer = { id: Date.now().toString(), name, elo, rd: 350, volatility: 0.06, wins:0, losses:0, lastMatchDate: new Date().toISOString() };
-    players.push(newPlayer);
-    await saveData();
-    updateUI();
-    addPlayerForm.reset();
-});
-
-// ---------------------
-// Log Match
-// ---------------------
-logMatchForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const winner = players.find(p => p.id === winnerSelect.value);
-    const loser = players.find(p => p.id === loserSelect.value);
-    if (!winner || !loser || winner.id === loser.id) return alert("Invalid");
-
-    const oldWinnerElo = winner.elo;
-    const oldLoserElo = loser.elo;
-
-    const winnerUpdate = calculateGlicko2(winner, [{opponentRating: loser.elo, opponentRD: loser.rd, outcome: 1}]);
-    const loserUpdate = calculateGlicko2(loser, [{opponentRating: winner.elo, opponentRD: winner.rd, outcome: 0}]);
-
-    winner.wins++; winner.lastMatchDate = new Date().toISOString();
-    loser.losses++; loser.lastMatchDate = new Date().toISOString();
-
-    const newActionId = Date.now() + Math.random();
-    actionLog.push({ id: newActionId, type:'match_result', winner: winner.name, loser: loser.name,
-                     winnerId: winner.id, loserId: loser.id,
-                     oldWinnerElo, oldLoserElo,
-                     newWinnerElo: winner.elo, newLoserElo: loser.elo,
-                     timestamp: new Date().toISOString() });
-
-    await saveData();
-    updatePlayerRDs();
-    updateUI();
-});
-
-// ---------------------
-// Save & UI functions
-// ---------------------
-async function saveData() {
-    players.forEach(p => db.collection('players').doc(p.id).set(p));
-    actionLog.forEach(a => db.collection('actionLog').doc(a.id.toString()).set(a));
-}
-
-function updateUI() {
-    players.sort((a,b)=>b.elo-a.elo);
-    leaderboardBody.innerHTML = '';
-    players.filter(p=>p.rd<100).forEach((p,i)=>{
-        const tr=document.createElement('tr');
-        tr.innerHTML=`<td>${i===0?'👑 1':i+1}</td>
-                      <td>${p.name}</td>
-                      <td>${p.elo} (±${p.rd})</td>
-                      <td>${p.wins}-${p.losses}</td>`;
-        leaderboardBody.appendChild(tr);
-    });
-
-    winnerSelect.innerHTML = loserSelect.innerHTML = '<option value="">Select...</option>';
-    players.sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{
-        winnerSelect.innerHTML += `<option value="${p.id}">${p.name} (${p.elo})</option>`;
-        loserSelect.innerHTML += `<option value="${p.id}">${p.name} (${p.elo})</option>`;
-    });
-}
-
-init();
-</script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="glicko.js"></script>
 </body>
 </html>
