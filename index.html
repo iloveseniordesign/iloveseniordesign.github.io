@@ -583,7 +583,7 @@
                 playerName: nameInput,
                 playerId: newPlayer.id,
                 initialElo: eloInput,
-                date: new Date().toLocaleString()
+                timestamp: new Date().toISOString()
             });
             
             await saveData();
@@ -632,7 +632,7 @@
                     oldLoserElo: oldLoserElo,
                     newWinnerElo: newWinnerElo,
                     newLoserElo: newLoserElo,
-                    date: new Date().toLocaleString()
+                    timestamp: new Date().toISOString()
                 });
 
                 await saveData();
@@ -693,13 +693,9 @@
                     db.collection('players').doc(player.id).set(player);
                 });
 
-                // Save action log to Firestore
+                // Save action log to Firestore (preserve existing timestamps)
                 actionLog.forEach(action => {
-                    const actionData = {
-                        ...action,
-                        timestamp: new Date()
-                    };
-                    db.collection('actionLog').doc(action.id.toString()).set(actionData);
+                    db.collection('actionLog').doc(action.id.toString()).set(action);
                 });
             } catch (error) {
                 console.error('Error saving data:', error);
@@ -715,8 +711,9 @@
             }
 
             actionLogContainer.innerHTML = '';
-            // Display in reverse chronological order (newest first)
-            [...actionLog].reverse().forEach((action) => {
+            // Sort by timestamp, then display in reverse chronological order (newest first)
+            const sortedLog = [...actionLog].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).reverse();
+            sortedLog.forEach((action) => {
                 const actionElement = document.createElement('div');
                 actionElement.className = 'match-row';
                 let actionHTML = '';
@@ -724,31 +721,34 @@
                 if (action.type === 'match_result') {
                     const winnerEloChange = action.newWinnerElo - action.oldWinnerElo;
                     const loserEloChange = action.newLoserElo - action.oldLoserElo;
+                    const actionDate = new Date(action.timestamp).toLocaleString();
                     actionHTML = `
                         <div class="match-info">
                             <div><span style="color: #ff8c00; font-weight: bold;">⚔️ Match:</span> <strong>${action.winner}</strong> <span style="color: var(--ball-orange);">defeated</span> <strong>${action.loser}</strong></div>
                             <div style="font-size: 0.85rem; color: #aaa; margin-top: 4px;">${action.oldWinnerElo} → ${action.newWinnerElo} <span style="color: #4fa34f;">(+${winnerEloChange})</span> vs ${action.oldLoserElo} → ${action.newLoserElo} <span style="color: #ff6464;">(${loserEloChange})</span></div>
-                            <div style="font-size: 0.75rem; color: #666;">${action.date}</div>
+                            <div style="font-size: 0.75rem; color: #666;">${actionDate}</div>
                         </div>
                         <div class="action-buttons">
                             <button class="btn-small btn-delete" onclick="deleteAction('${action.id}')">Remove</button>
                         </div>
                     `;
                 } else if (action.type === 'player_added') {
+                    const actionDate = new Date(action.timestamp).toLocaleString();
                     actionHTML = `
                         <div class="match-info">
                             <div><span style="color: #4foo4; font-weight: bold;">➕ Player:</span> <strong>${action.playerName}</strong> added with ELO ${action.initialElo}</div>
-                            <div style="font-size: 0.75rem; color: #666;">${action.date}</div>
+                            <div style="font-size: 0.75rem; color: #666;">${actionDate}</div>
                         </div>
                         <div class="action-buttons">
                             <button class="btn-small btn-delete" onclick="deleteAction('${action.id}')">Remove</button>
                         </div>
                     `;
                 } else if (action.type === 'player_removed') {
+                    const actionDate = new Date(action.timestamp).toLocaleString();
                     actionHTML = `
                         <div class="match-info">
                             <div><span style="color: #ff4444; font-weight: bold;">❌ Player:</span> <strong>${action.playerName}</strong> removed (${action.wins}W - ${action.losses}L)</div>
-                            <div style="font-size: 0.75rem; color: #666;">${action.date}</div>
+                            <div style="font-size: 0.75rem; color: #666;">${actionDate}</div>
                         </div>
                         <div class="action-buttons">
                             <button class="btn-small btn-delete" onclick="deleteAction('${action.id}')">Remove</button>
@@ -885,7 +885,7 @@
                 elo: player.elo,
                 wins: player.wins,
                 losses: player.losses,
-                date: new Date().toLocaleString()
+                timestamp: new Date().toISOString()
             });
             
             // Remove all matches involving this player
