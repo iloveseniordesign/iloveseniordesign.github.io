@@ -1,184 +1,153 @@
-// Firebase Configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyCHRQOLzC0DcuZv4aCqsL4EM_IVthiZSIc",
-    authDomain: "tttiw-6d44e.firebaseapp.com",
-    projectId: "tttiw-6d44e",
-    storageBucket: "tttiw-6d44e.firebasestorage.app",
-    messagingSenderId: "902138155809",
-    appId: "1:902138155809:web:0860c66b77d07746952460"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+// glicko.js
+// Real Glicko-2 implementation (simplified for single match updates)
+// https://www.glicko.net/glicko/glicko2.pdf
 
-let players = [];
-let actionLog = [];
-const TAU = 0.5;
+const GLICKO2_SCALE = 173.7178; // 400 / ln(10)
+const TAU = 0.5;                 // system constant, typical 0.3–1.2
 
-// DOM
-const leaderboardBody = document.getElementById('leaderboard-body');
-const addPlayerForm = document.getElementById('add-player-form');
-const logMatchForm = document.getElementById('log-match-form');
-const winnerSelect = document.getElementById('winner-select');
-const loserSelect = document.getElementById('loser-select');
-const actionLogContainer = document.getElementById('action-log-container');
-const playersListContainer = document.getElementById('players-list');
-
-// ----- RD Functions -----
-function calculateRD(lastMatch) {
-    if (!lastMatch) return 350;
-    const now = new Date();
-    const last = new Date(lastMatch);
-    const days = (now - last)/(1000*60*60*24);
-    return Math.min(350, 50 + (days/10)*50);
+// Convert rating/RD to Glicko-2 scale
+function toGlicko2Scale(rating, rd) {
+    const mu = (rating - 1500) / GLICKO2_SCALE;
+    const phi = rd / GLICKO2_SCALE;
+    return { mu, phi };
 }
 
-function glicko2Update(player, results) {
-    // player: {rating, rd, volatility}
+// Convert back to normal rating scale
+function fromGlicko2Scale(mu, phi) {
+    const rating = mu * GLICKO2_SCALE + 1500;
+    const rd = phi * GLICKO2_SCALE;
+    return { rating, rd };
+}
+
+// g(phi) factor
+function g(phi) {
+    return 1 / Math.sqrt(1 + (3 * phi * phi) / (Math.PI * Math.PI));
+}
+
+// Expected score
+function E(mu, mu_j, phi_j) {
+    return 1 / (1 + Math.exp(-g(phi_j) * (mu - mu_j)));
+}
+
+// Calculate d^2
+function calculateD2(phi, results) {
+    let sum = 0;
+    results.forEach(r => {
+        const Eij = E(r.mu_j, r.mu, r.phi_j);
+        const gphi = g(r.phi_j);
+        sum += gphi * gphi * Eij * (1 - Eij);
+    });
+    return 1 / sum;
+}
+
+// Volatility update (simplified iterative method)
+function updateVolatility(phi, sigma, delta, v) {
+    const a = Math.log(sigma * sigma);
+    const EPSILON = 0.000001;
+
+    let A = a;
+    let B;
+    if (delta * delta > phi * phi + v) {
+        B = Math.log(delta * delta - phi * phi - v);
+    } else {
+        let k = 1;
+        while (f(a - k * TAU, delta, phi, v, a) < 0) k++;
+        B = a - k * TAU;
+    }
+
+    let fA = f(A, delta, phi, v, a);
+    let fB = f(B, delta, phi, v, a);
+
+    while (Math.abs(B - A) > EPSILON) {
+        const C = A + (A - B) * fA / (fB - fA);
+        const fC = f(C, delta, phi, v, a);
+        if (fC * fB < 0) {
+            A = B;
+            fA = fB;
+        } else {
+            fA = fA / 2;
+        }
+        B = C;
+        fB = fC;
+    }
+
+    return Math.exp(A / 2);
+}
+
+function f(x, delta, phi, v, a) {
+    const ex = Math.exp(x);
+    return ex * (delta * delta - phi * phi - v - ex) / (2 * (phi * phi + v + ex) * (phi * phi + v + ex)) - (x - a) / (TAU * TAU);
+}
+
+// Update rating for a single match
+// results: [{ opponentRating, opponentRD, score }]
+export function updateGlicko2Rating(player, results) {
     if (results.length === 0) return player;
 
-    const PI = Math.PI;
-    const phi = player.rd / 173.717;
-    let v = 0, delta = 0;
-    results.forEach(r => {
-        const g = 1 / Math.sqrt(1 + 3 * r.opponentRD*r.opponentRD/(PI*PI*400*400));
-        const E = 1 / (1 + Math.pow(10, -g*(player.rating - r.opponentRating)/400));
-        v += g*g*E*(1-E);
-        delta += g*(r.outcome - E);
-    });
-    v = 1/v;
-    delta = v*delta;
+    // Convert to Glicko-2 scale
+    let { mu, phi } = toGlicko2Scale(player.rating, player.rd);
+    let sigma = player.volatility;
 
-    const newPhi = 1 / Math.sqrt(1/(phi*phi) + 1/v);
-    const newRating = player.rating + 400*(delta / newPhi);
+    // Prepare opponent data
+    const opps = results.map(r => {
+        const { mu: mu_j, phi: phi_j } = toGlicko2Scale(r.opponentRating, r.opponentRD);
+        return { mu_j, phi_j, score: r.score, mu };
+    });
+
+    // Step 1: compute v
+    let v_inv = 0;
+    opps.forEach(r => {
+        const Eij = E(mu, r.mu_j, r.phi_j);
+        const gphi = g(r.phi_j);
+        v_inv += gphi * gphi * Eij * (1 - Eij);
+    });
+    const v = 1 / v_inv;
+
+    // Step 2: compute delta
+    let delta = 0;
+    opps.forEach(r => {
+        const Eij = E(mu, r.mu_j, r.phi_j);
+        const gphi = g(r.phi_j);
+        delta += gphi * (r.score - Eij);
+    });
+    delta *= v;
+
+    // Step 3: update volatility
+    const sigma_prime = updateVolatility(phi, sigma, delta, v);
+
+    // Step 4: update phi*
+    const phi_star = Math.sqrt(phi * phi + sigma_prime * sigma_prime);
+
+    // Step 5: update phi and mu
+    let phi_prime = 1 / Math.sqrt(1 / (phi_star * phi_star) + 1 / v);
+
+    let sum = 0;
+    opps.forEach(r => {
+        const Eij = E(mu, r.mu_j, r.phi_j);
+        const gphi = g(r.phi_j);
+        sum += gphi * (r.score - Eij);
+    });
+    const mu_prime = mu + phi_prime * phi_prime * sum;
+
+    // Convert back to rating scale
+    const { rating, rd } = fromGlicko2Scale(mu_prime, phi_prime);
+
     return {
         ...player,
-        rating: Math.round(newRating),
-        rd: Math.max(50, newPhi*173.717),
-        volatility: player.volatility
+        rating: Math.round(rating),
+        rd: rd,
+        volatility: sigma_prime
     };
 }
 
-// ----- UI & Firebase -----
-async function init() {
-    try {
-        const playerSnap = await db.collection('players').get();
-        players = playerSnap.docs.map(d => d.data());
-        const logSnap = await db.collection('actionLog').orderBy('timestamp','asc').get();
-        actionLog = logSnap.docs.map(d => ({...d.data(), id:d.id}));
-        updatePlayerRDs();
-        updateUI();
-    } catch(e){console.error(e);}
+// RD time decay (50 → 100 in 10 days)
+export function applyRDDecay(player, lastMatchDate) {
+    if (!lastMatchDate) return { ...player, rd: 350 };
+    const now = new Date();
+    const last = new Date(lastMatchDate);
+    const days = (now - last) / (1000 * 60 * 60 * 24);
+    const RD_min = 50;
+    const RD_max = 100;
+    const newRD = Math.min(RD_max, RD_min + (RD_max - RD_min) * (days / 10));
+    return { ...player, rd: newRD };
 }
-
-function updatePlayerRDs() {
-    players.forEach(p => p.rd = calculateRD(p.lastMatchDate));
-}
-
-addPlayerForm.addEventListener('submit', async e=>{
-    e.preventDefault();
-    const name = document.getElementById('player-name').value.trim();
-    const elo = parseInt(document.getElementById('initial-elo').value);
-    if(!name) return alert("Enter name");
-    const newPlayer = {
-        id: Date.now().toString(),
-        name,
-        rating: elo,
-        rd: 350,
-        volatility: 2.0,
-        wins:0,
-        losses:0,
-        lastMatchDate: new Date().toISOString()
-    };
-    players.push(newPlayer);
-    await saveData();
-    updateUI();
-    addPlayerForm.reset();
-});
-
-logMatchForm.addEventListener('submit', async e=>{
-    e.preventDefault();
-    const winnerId = winnerSelect.value, loserId = loserSelect.value;
-    if(winnerId===loserId) return alert("Cannot play yourself");
-    const winner = players.find(p=>p.id===winnerId);
-    const loser = players.find(p=>p.id===loserId);
-    if(!winner||!loser) return;
-
-    const winnerResults = [{opponentRating: loser.rating, opponentRD: loser.rd, outcome:1}];
-    const loserResults = [{opponentRating: winner.rating, opponentRD: winner.rd, outcome:0}];
-
-    const oldW = winner.rating, oldL = loser.rating;
-    Object.assign(winner, glicko2Update(winner, winnerResults));
-    winner.wins++; winner.lastMatchDate = new Date().toISOString();
-    Object.assign(loser, glicko2Update(loser, loserResults));
-    loser.losses++; loser.lastMatchDate = new Date().toISOString();
-
-    actionLog.push({
-        id: Date.now().toString(),
-        type:'match_result',
-        winner:winner.name,
-        loser:loser.name,
-        winnerId,
-        loserId,
-        oldWinnerElo: oldW,
-        oldLoserElo: oldL,
-        newWinnerElo: winner.rating,
-        newLoserElo: loser.rating,
-        timestamp: new Date().toISOString()
-    });
-
-    await saveData(); updatePlayerRDs(); updateUI(); logMatchForm.reset();
-});
-
-async function saveData(){
-    players.forEach(p=>db.collection('players').doc(p.id).set(p));
-    actionLog.forEach(a=>db.collection('actionLog').doc(a.id.toString()).set(a));
-}
-
-function updateUI(){
-    players.sort((a,b)=>b.rating-a.rating);
-    leaderboardBody.innerHTML='';
-    const visible = players.filter(p=>p.rd<100);
-    visible.forEach((p,i)=>{
-        const tr=document.createElement('tr');
-        tr.innerHTML=`<td class="${i===0?'rank-1':''}">${i===0?'👑 1':i+1}</td>
-        <td class="${i===0?'rank-1':''}">${p.name}</td>
-        <td class="${i===0?'rank-1':''}">${p.rating} (±${p.rd.toFixed(1)})</td>
-        <td>${p.wins}-${p.losses}</td>`;
-        leaderboardBody.appendChild(tr);
-    });
-
-    winnerSelect.innerHTML='<option value="">Select Winner...</option>';
-    loserSelect.innerHTML='<option value="">Select Loser...</option>';
-    players.forEach(p=>{
-        winnerSelect.innerHTML+=`<option value="${p.id}">${p.name}</option>`;
-        loserSelect.innerHTML+=`<option value="${p.id}">${p.name}</option>`;
-    });
-
-    if(players.length===0) playersListContainer.innerHTML='<p style="color:#888;text-align:center;">No players yet</p>';
-    else {
-        playersListContainer.innerHTML='';
-        players.forEach(p=>{
-            const div=document.createElement('div'); div.className='match-row';
-            div.innerHTML=`<span>${p.name} | ${p.rating} (±${p.rd.toFixed(1)})</span>
-            <div class="action-buttons">
-            <button class="btn-small btn-delete" onclick="deletePlayer('${p.id}')">Delete</button></div>`;
-            playersListContainer.appendChild(div);
-        });
-    }
-
-    if(actionLog.length===0) actionLogContainer.innerHTML='<p style="color:#888;text-align:center;">No actions recorded yet</p>';
-    else {
-        actionLogContainer.innerHTML='';
-        actionLog.forEach(a=>{
-            const div=document.createElement('div'); div.className='match-row';
-            div.textContent=`${a.timestamp.split('T')[0]}: ${a.winner} (${a.oldWinnerElo}→${a.newWinnerElo}) beat ${a.loser} (${a.oldLoserElo}→${a.newLoserElo})`;
-            actionLogContainer.appendChild(div);
-        });
-    }
-}
-
-window.deletePlayer = async function(id){
-    players=players.filter(p=>p.id!==id);
-    await db.collection('players').doc(id).delete();
-    updateUI();
-};
