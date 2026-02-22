@@ -544,11 +544,33 @@
                     id: doc.data().id
                 }));
 
+                // Recalculate RD for all players on page load
+                updatePlayerRDs();
                 updateUI();
             } catch (error) {
                 console.error('Error loading data:', error);
                 alert('Error connecting to database. Check your Firebase config.');
             }
+        }
+
+        // Calculate RD (Rating Deviation) - increases 50-350 over 10 days
+        // Players hidden from leaderboard when RD >= 100
+        function calculateRD(lastMatchDate) {
+            if (!lastMatchDate) {
+                return 350; // New players start at max RD (hidden)
+            }
+            const now = new Date();
+            const last = new Date(lastMatchDate);
+            const daysSinceMatch = (now - last) / (1000 * 60 * 60 * 24);
+            const rdIncrease = (daysSinceMatch / 10) * 300; // 300 RD points per 10 days
+            return Math.min(350, 50 + rdIncrease); // Cap at 350, min 50
+        }
+
+        // Update RD for all players based on time since last match
+        function updatePlayerRDs() {
+            players.forEach(player => {
+                player.rd = calculateRD(player.lastMatchDate);
+            });
         }
 
         // Calculate standard ELO
@@ -569,8 +591,10 @@
                 id: Date.now().toString(),
                 name: nameInput,
                 elo: eloInput,
+                rd: 350,
                 wins: 0,
-                losses: 0
+                losses: 0,
+                lastMatchDate: new Date().toISOString()
             };
 
             players.push(newPlayer);
@@ -615,9 +639,11 @@
                 // Update stats
                 winner.elo = newWinnerElo;
                 winner.wins += 1;
+                winner.lastMatchDate = new Date().toISOString();
                 
                 loser.elo = newLoserElo;
                 loser.losses += 1;
+                loser.lastMatchDate = new Date().toISOString();
 
                 // Log action
                 const newActionId = Date.now() + Math.random();
@@ -636,6 +662,7 @@
                 });
 
                 await saveData();
+                updatePlayerRDs();
                 updateUI();
                 logMatchForm.reset();
             }
@@ -646,17 +673,19 @@
             // Sort players by ELO descending
             players.sort((a, b) => b.elo - a.elo);
 
-            // Render Leaderboard
+            // Render Leaderboard (only show players with RD < 100)
             leaderboardBody.innerHTML = '';
-            players.forEach((player, index) => {
+            const visiblePlayers = players.filter(p => (p.rd || 350) < 100);
+            visiblePlayers.forEach((player, index) => {
                 const tr = document.createElement('tr');
                 const rankClass = index === 0 ? 'rank-1' : '';
                 const rankDisplay = index === 0 ? '👑 1' : index + 1;
+                const rd = player.rd ? player.rd.toFixed(1) : '100.0';
                 
                 tr.innerHTML = `
                     <td class="${rankClass}">${rankDisplay}</td>
                     <td class="${rankClass}">${player.name}</td>
-                    <td class="${rankClass}">${player.elo}</td>
+                    <td class="${rankClass}">${player.elo} (±${rd})</td>
                     <td>${player.wins} - ${player.losses}</td>
                 `;
                 leaderboardBody.appendChild(tr);
@@ -772,9 +801,11 @@
             players.forEach((player) => {
                 const playerElement = document.createElement('div');
                 playerElement.className = 'match-row';
+                const rd = player.rd ? player.rd.toFixed(1) : '350.0';
+                const rdStatus = player.rd < 100 ? '' : ' (Hidden from leaderboard)';
                 playerElement.innerHTML = `
                     <div class="match-info">
-                        <div><strong>${player.name}</strong> - ELO: ${player.elo}</div>
+                        <div><strong>${player.name}</strong> - ELO: ${player.elo} (±${rd})${rdStatus}</div>
                         <div style="font-size: 0.85rem; color: #aaa;">${player.wins}W - ${player.losses}L</div>
                     </div>
                     <div class="action-buttons">
