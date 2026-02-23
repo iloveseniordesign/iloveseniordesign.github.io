@@ -481,16 +481,16 @@
   /* QUOTE */
   .lb-quote {
     font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    color: var(--muted);
+    font-size: 0.88rem;
+    color: var(--text);
     font-style: italic;
     margin-bottom: 1.5rem;
     text-align: center;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     line-height: 1.6;
-    opacity: 0.8;
+    opacity: 0.7;
   }
-  .lb-quote .quote-attr { color: var(--muted); font-style: normal; }
+  .lb-quote .quote-attr { color: var(--accent); font-style: normal; opacity: 0.8; }
   .modal-quote {
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
@@ -624,6 +624,10 @@
           </div>
           <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
           <div class="msg" id="player-msg"></div>
+          <p style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:1rem;line-height:1.7">
+            New players start at <span style="color:var(--accent)">Rating 1500</span> · <span style="color:var(--accent)">RD 120</span>.<br>
+            Use Edit Stats on a player card to adjust after adding.
+          </p>
         </div>
 
         <div class="form-card" style="border-color:#2e2e4e">
@@ -726,6 +730,26 @@
           <div class="rule-body">
             <div class="rule-title">Fairness Rule</div>
             <div class="rule-desc">Beating stronger players gains more ELO.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:2.5rem">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.08em;color:var(--text);margin-bottom:1.5rem">Rating System</div>
+        <div class="rules-list">
+          <div class="rule-item">
+            <div class="rule-icon" style="font-size:1rem">RD</div>
+            <div class="rule-body">
+              <div class="rule-title">Rating Deviation</div>
+              <div class="rule-desc">RD measures confidence in a player's rating. A high RD means fewer matches have been played and the rating is less certain — a new player starts at RD 120. RD decays upward over time when inactive, reflecting increased uncertainty. Players with RD above 100 are hidden from the leaderboard until they play enough to establish a reliable rating.</div>
+            </div>
+          </div>
+          <div class="rule-item">
+            <div class="rule-icon" style="font-size:1rem">G2</div>
+            <div class="rule-body">
+              <div class="rule-title">Glicko-2 Algorithm</div>
+              <div class="rule-desc">Ratings use the Glicko-2 system, an improvement on traditional ELO. Every match updates both players' ratings based on the expected outcome — upsets gain more points, expected wins gain less. Starting rating is 1500 for all players.</div>
+            </div>
           </div>
         </div>
       </div>
