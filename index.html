@@ -7,16 +7,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --border: #1e1e2e;
-    --accent: #e8ff47;
-    --accent2: #ff4757;
-    --accent3: #47b8ff;
-    --text: #e0e0f0;
-    --muted: #5a5a7a;
-    --win: #47ffb8;
-    --loss: #ff4757;
+    --bg: #1e1018;
+    --surface: #2a1520;
+    --border: #4a2a38;
+    --accent: #E5B25D;
+    --accent2: #c0392b;
+    --accent3: #c9a0dc;
+    --text: #E1E2EF;
+    --muted: #8a6a78;
+    --win: #7ec8a0;
+    --loss: #d9534f;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -33,8 +33,8 @@
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(ellipse at 30% 20%, rgba(232,255,71,0.04) 0%, transparent 50%),
-                radial-gradient(ellipse at 70% 80%, rgba(71,184,255,0.04) 0%, transparent 50%);
+    background: radial-gradient(ellipse at 30% 20%, rgba(229,178,93,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(53,30,41,0.8) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
   }
@@ -127,10 +127,10 @@
   }
   .lb-table td {
     padding: 1rem;
-    border-bottom: 1px solid rgba(30,30,46,0.5);
+    border-bottom: 1px solid rgba(74,42,56,0.5);
     vertical-align: middle;
   }
-  .lb-table tr:hover td { background: rgba(232,255,71,0.02); }
+  .lb-table tr:hover td { background: rgba(229,178,93,0.05); }
   .lb-table tbody tr { cursor: pointer; }
   .rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--muted); width: 3rem; }
   .rank.top1 { color: var(--accent); }
@@ -185,7 +185,7 @@
 
   .btn {
     background: var(--accent);
-    color: #0a0a0f;
+    color: #1e1018;
     border: none;
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
@@ -197,7 +197,7 @@
     transition: all 0.15s;
     display: inline-block;
   }
-  .btn:hover { background: #fff; }
+  .btn:hover { background: #f5e6cc; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-danger {
     background: var(--loss);
@@ -219,7 +219,7 @@
     padding: 0.75rem 1rem;
     margin-top: 1rem;
     border-left: 3px solid var(--accent);
-    background: rgba(232,255,71,0.05);
+    background: rgba(229,178,93,0.07);
     color: var(--accent);
     display: none;
   }
@@ -239,7 +239,7 @@
     gap: 1rem;
     transition: border-color 0.2s;
   }
-  .match-row:hover { border-color: #2e2e4e; }
+  .match-row:hover { border-color: var(--border); }
   .match-player { display: flex; flex-direction: column; gap: 0.25rem; }
   .match-player .name { font-weight: 600; font-size: 0.95rem; }
   .match-player .delta { font-family: 'DM Mono', monospace; font-size: 0.75rem; }
@@ -347,14 +347,15 @@
   .chart-section { margin-bottom: 2rem; }
   .chart-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem; }
   .chart-outer { border: 1px solid var(--border); background: var(--bg); overflow-x: auto; overflow-y: hidden; position: relative; height: 220px; cursor: crosshair; }
-  .chart-outer::-webkit-scrollbar { height: 4px; }
+  .chart-outer::-webkit-scrollbar { height: 5px; }
   .chart-outer::-webkit-scrollbar-track { background: var(--bg); }
   .chart-outer::-webkit-scrollbar-thumb { background: var(--border); }
+  .chart-outer::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   .chart-wrap { position: relative; display: inline-block; min-width: 100%; }
   .chart-tooltip {
     position: absolute;
-    background: #13131e;
-    border: 1px solid #2e2e4e;
+    background: var(--surface);
+    border: 1px solid var(--border);
     padding: 0.5rem 0.8rem;
     font-family: 'DM Mono', monospace;
     font-size: 0.7rem;
@@ -373,7 +374,7 @@
     align-items: center;
     gap: 1rem;
     padding: 0.85rem 0;
-    border-bottom: 1px solid rgba(30,30,46,0.6);
+    border-bottom: 1px solid rgba(74,42,56,0.6);
   }
   .profile-match:last-child { border-bottom: none; }
   .pm-badge { font-family: 'Bebas Neue', sans-serif; font-size: 0.95rem; width: 3.2rem; text-align: center; padding: 0.3rem 0; letter-spacing: 0.05em; }
@@ -409,7 +410,7 @@
     flex-direction: column;
     gap: 0.9rem;
   }
-  .player-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .player-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 24px rgba(229,178,93,0.12); }
   .player-card-top {
     display: flex;
     align-items: center;
@@ -460,13 +461,23 @@
     border-top: 1px solid var(--border);
   }
 
+
+  /* ── SCROLLBARS ── */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  ::-webkit-scrollbar-corner { background: var(--bg); }
+  /* Firefox */
+  * { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
+
 </style>
 </head>
 <body>
 
 <header>
   <h1>TTTIW</h1>
-  <span>Texas Invention<span style="color:var(--accent)">Works</span> · Rating System</span>
+  <span>Table Tennis · Texas Invention<span style="color:var(--accent)">Works</span> · Rating System</span>
   <span id="decay-status" style="margin-left:auto;font-size:0.65rem;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.1em"></span>
 </header>
 
@@ -1309,34 +1320,34 @@ function drawChart(points) {
     // Grid
     for (let g = 0; g <= 4; g++) {
       const y = PAD.top + (g / 4) * chartH;
-      ctx.strokeStyle = 'rgba(30,30,46,0.9)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(74,42,56,0.9)'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
-      ctx.fillStyle = '#5a5a7a'; ctx.font = '10px DM Mono, monospace'; ctx.textAlign = 'right';
+      ctx.fillStyle = '#8a6a78'; ctx.font = '10px DM Mono, monospace'; ctx.textAlign = 'right';
       ctx.fillText(Math.round(hi - (g / 4) * (hi - lo)), PAD.left - 6, y + 3);
     }
     if (points.length < 2) {
-      ctx.fillStyle = '#5a5a7a'; ctx.font = '12px DM Mono, monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#8a6a78'; ctx.font = '12px DM Mono, monospace'; ctx.textAlign = 'center';
       ctx.fillText('Play more matches to see rating history', W / 2, H / 2); return;
     }
     // Lines + fills
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1], cur = points[i];
-      const color = cur.won ? '#47ffb8' : '#ff4757';
+      const color = cur.won ? 'var(--win)' : '#ff4757';
       ctx.beginPath();
       ctx.moveTo(xOf(i-1), yOf(prev.rating)); ctx.lineTo(xOf(i), yOf(cur.rating));
       ctx.lineTo(xOf(i), H - PAD.bottom); ctx.lineTo(xOf(i-1), H - PAD.bottom); ctx.closePath();
-      ctx.fillStyle = cur.won ? 'rgba(71,255,184,0.07)' : 'rgba(255,71,87,0.07)'; ctx.fill();
+      ctx.fillStyle = cur.won ? 'rgba(126,200,160,0.1)' : 'rgba(217,83,79,0.1)'; ctx.fill();
       ctx.beginPath(); ctx.moveTo(xOf(i-1), yOf(prev.rating)); ctx.lineTo(xOf(i), yOf(cur.rating));
       ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
     }
     // Dots
     for (let i = 0; i < points.length; i++) {
       const pt    = points[i];
-      const color = i === 0 ? '#5a5a7a' : (pt.won ? '#47ffb8' : '#ff4757');
+      const color = i === 0 ? '#8a6a78' : (pt.won ? 'var(--win)' : '#ff4757');
       const isHl  = i === hlIdx;
       if (isHl) {
         ctx.beginPath(); ctx.arc(xOf(i), yOf(pt.rating), 9, 0, Math.PI*2);
-        ctx.fillStyle = i === 0 ? 'rgba(90,90,122,0.2)' : (pt.won ? 'rgba(71,255,184,0.2)' : 'rgba(255,71,87,0.2)');
+        ctx.fillStyle = i === 0 ? 'rgba(138,106,120,0.25)' : (pt.won ? 'rgba(126,200,160,0.25)' : 'rgba(217,83,79,0.25)');
         ctx.fill();
       }
       ctx.beginPath(); ctx.arc(xOf(i), yOf(pt.rating), isHl ? 5 : 4, 0, Math.PI*2);
@@ -1351,10 +1362,10 @@ function drawChart(points) {
 
   function showTooltip(idx) {
     const pt = points[idx];
-    const colorHex = idx === 0 ? '#5a5a7a' : (pt.won ? '#47ffb8' : '#ff4757');
+    const colorHex = idx === 0 ? '#8a6a78' : (pt.won ? 'var(--win)' : '#ff4757');
     let html = `<span style="font-family:'Bebas Neue',sans-serif;font-size:1.15rem;color:${colorHex}">${Math.round(pt.rating)}</span>`;
     if (idx === 0) {
-      html += `<br><span style="color:#5a5a7a">Starting rating</span>`;
+      html += `<br><span style="color:#8a6a78">Starting rating</span>`;
     } else {
       const d    = new Date(pt.date);
       const dStr = (pt.rating - points[idx-1].rating);
