@@ -630,14 +630,27 @@ function initListeners() {
     (err) => { console.error('Matches listener error:', err); }
   );
 
-  // Decay settings listener (single doc in a 'config' collection)
+  // Decay settings listener — loads BEFORE applying decay so getDecayPeriodMs() uses the correct value.
+  let decaySettingsReady = false;
   onSnapshot(doc(db, 'config', 'decay'), (snap) => {
     if (snap.exists()) {
       const data = snap.data();
       document.getElementById('decay-amount').value = data.amount || '7';
       document.getElementById('decay-unit').value   = data.unit   || 'days';
     }
+    if (!decaySettingsReady) {
+      decaySettingsReady = true;
+      // Re-apply decay now that settings are loaded with the correct period
+      applyDecayLocally();
+      updateDecayStatus();
+    }
   });
+
+  // Tick the countdown every second so the header timer is always live
+  setInterval(updateDecayStatus, 1000);
+
+  // Re-check and apply decay every 5 seconds while the page is open
+  setInterval(applyDecayLocally, 5000);
 }
 
 // ─── RD DECAY (lazy / client-side) ───────────────────────────────────────────
@@ -833,9 +846,13 @@ window.saveDecaySettings = async function() {
       // Save to Firestore so all clients share the same setting
       await setDoc(doc(db, 'config', 'decay'), { amount, unit });
     }
-    applyDecayLocally();
-    updateDecayStatus();
-    showMsg('decay-msg', `Decay period set to ${amount} ${unit}.`);
+    // Reset all players' lastDecayAt to now so the new period starts fresh
+    // (prevents instant mass-decay when shortening the period)
+    const now = Date.now();
+    await Promise.all(players.map(p =>
+      updateDoc(doc(db, 'players', p.firestoreId), { lastDecayAt: now })
+    ));
+    showMsg('decay-msg', `Decay period set to ${amount} ${unit}. Timers reset.`);
   } catch(e) {
     showMsg('decay-msg', 'Error: ' + e.message, true);
   }
