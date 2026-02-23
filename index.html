@@ -1061,7 +1061,7 @@ window.addPlayer = async function() {
 window.removePlayer = async function(firestoreId) {
   if (!db) return;
   const pw = prompt('Enter admin password to remove player:');
-  if (pw !== 'admin') { alert('Incorrect password.'); return; }
+  if (pw !== 'pppaddle') { alert('Incorrect password.'); return; }
   if (!confirm('Remove this player? Their match history will remain.')) return;
   try {
     await deleteDoc(doc(db, 'players', firestoreId));
@@ -1074,7 +1074,7 @@ window.removePlayer = async function(firestoreId) {
 window.adminEditPlayer = async function(firestoreId) {
   if (!db) return;
   const pw = prompt('Enter admin password:');
-  if (pw !== 'admin') { alert('Incorrect password.'); return; }
+  if (pw !== 'pppaddle') { alert('Incorrect password.'); return; }
   const p = players.find(x => x.firestoreId === firestoreId);
   if (!p) return;
   const newRating = parseFloat(prompt(`New rating for ${p.name} (current: ${Math.round(p.rating)}):`, Math.round(p.rating)));
@@ -1304,6 +1304,8 @@ function renderPlayersList() {
 
 // ─── DECAY SETTINGS ──────────────────────────────────────────────────────────
 window.saveDecaySettings = async function() {
+  const pw = prompt('Enter admin password:');
+  if (pw !== 'pppaddle') { alert('Incorrect password.'); return; }
   const amount = parseFloat(document.getElementById('decay-amount').value);
   const unit   = document.getElementById('decay-unit').value;
   if (!amount || amount < 0.01) { showMsg('decay-msg', 'Enter a valid period.', true); return; }
