@@ -355,10 +355,8 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
             Tap any player card to add a profile photo &amp; quote.
           </p>
         </div>
-        <!-- Mobile cards -->
         <div class="players-sidebar-mobile" id="players-list-mobile"></div>
       </div>
-      <!-- Desktop cards -->
       <div id="players-list-desktop"></div>
     </div>
   </div>
@@ -398,7 +396,8 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       </div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.08em;color:var(--text);margin:1.75rem 0 1.1rem">Rating System</div>
       <div class="rules-list">
-        <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">RD</div><div><div class="rule-title">Rating Deviation</div><div class="rule-desc">RD measures confidence in a player's rating. High RD = fewer matches played, less certainty. New players start at RD 120. RD increases over inactivity. Players with RD&gt;100 are hidden from the leaderboard.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">RD</div><div><div class="rule-title">Rating Deviation</div><div class="rule-desc">RD measures how confident the system is in a player's rating. A low RD means the rating is reliable; a high RD means more uncertainty. New players start at RD 120. After enough games, RD can drop below 100 — only then does a player appear on the leaderboard. RD also decreases as you play more matches.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">⏱ RD</div><div><div class="rule-title">RD Decay (Inactivity)</div><div class="rule-desc">If you stop playing, your RD slowly increases over time — because the system becomes less certain your rating is still accurate. This happens on a configurable timer (default: every 7 days of inactivity). Each period of inactivity increases RD using the Glicko-2 formula φ* = √(φ² + σ²). RD is capped at 200. If your RD rises above 100 you'll be hidden from the leaderboard until you play again.</div></div></div>
         <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">G2</div><div><div class="rule-title">Glicko-2 Algorithm</div><div class="rule-desc">Uses Glicko-2, an improvement on ELO. Every match updates both players' ratings based on expected outcome — upsets gain more, expected wins gain less. Starting rating: 1500.</div></div></div>
       </div>
     </div>
@@ -407,6 +406,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
   <!-- ADMIN -->
   <div id="panel-admin" class="panel">
     <div style="max-width:820px">
+
       <div class="admin-section">
         <div class="admin-stitle">Season Settings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.3);max-width:480px">
@@ -427,27 +427,41 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
           <div id="season-status-admin" style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-top:.75rem;line-height:1.7;display:none"></div>
         </div>
       </div>
+
       <div class="admin-section">
         <div class="admin-stitle">RD Decay Settings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.15);max-width:480px">
           <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">RD increases each inactive period using the Glicko-2 formula <strong style="color:var(--text)">φ* = √(φ² + σ²)</strong>. Default: 7 days · Max RD: 200 · Hidden from leaderboard if RD &gt; 100.</p>
-          <div id="decay-info" style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);line-height:1.8;padding:.6rem .8rem;background:rgba(0,0,0,.2);border:1px solid var(--border)">
+          <div id="decay-info" style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);line-height:1.8;padding:.6rem .8rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.9rem">
             Loading current settings…
           </div>
+          <div class="field">
+            <label>Decay Period</label>
+            <div style="display:flex;gap:.6rem">
+              <input type="number" id="decay-amount" value="7" min="1" style="width:90px;flex-shrink:0;flex:none">
+              <select id="decay-unit">
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days" selected>Days</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn" onclick="saveDecay()">Save Decay Settings</button>
+          <div class="msg" id="decay-msg"></div>
         </div>
-        <!-- hidden inputs keep the decay logic working -->
-        <input type="hidden" id="decay-amount" value="7">
-        <input type="hidden" id="decay-unit" value="days">
       </div>
+
       <div class="admin-section">
         <div class="admin-stitle">Manage Players</div>
         <div id="admin-players-list"><div class="loading">Loading</div></div>
       </div>
+
       <div class="admin-section">
-        <div class="admin-stitle">Match Log (Delete Matches)</div>
-        <p style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-bottom:.75rem;line-height:1.5">⚠ Deleting a match does NOT recalculate ratings. Use with caution.</p>
+        <div class="admin-stitle">Match Log (Delete &amp; Recalculate)</div>
+        <p style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-bottom:.75rem;line-height:1.5">Deleting a match will recalculate all ratings and RD from that point forward, including time-based decay.</p>
         <div id="admin-matches-list"><div class="loading">Loading</div></div>
       </div>
+
     </div>
   </div>
 </main>
@@ -485,8 +499,34 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
           </div>
         </div>
       </div>
-      <div class="chart-lbl" style="margin-bottom:.65rem">Match History</div>
       <div id="profile-matches"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CROP MODAL -->
+<div class="am-overlay" id="crop-overlay" style="z-index:400">
+  <div style="background:var(--surface);border:1px solid var(--border);width:100%;max-width:380px;animation:mIn .2s ease">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:.08em;color:var(--text)">Crop Photo</span>
+      <button class="m-close" onclick="closeCropModal()">✕</button>
+    </div>
+    <div style="padding:1.25rem">
+      <p style="font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:.85rem;line-height:1.6">Drag to reposition · Scroll or pinch to zoom</p>
+      <div style="display:flex;justify-content:center;margin-bottom:1rem">
+        <div id="crop-viewport" style="width:240px;height:240px;border-radius:50%;overflow:hidden;border:2px solid var(--accent);position:relative;cursor:grab;background:#111;touch-action:none;flex-shrink:0">
+          <img id="crop-img" style="position:absolute;transform-origin:top left;user-select:none;-webkit-user-drag:none;pointer-events:none" draggable="false">
+        </div>
+      </div>
+      <div style="margin-bottom:1rem">
+        <label style="display:block;font-family:'DM Mono',monospace;font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem">Zoom</label>
+        <input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1" style="width:100%;padding:0;height:3px;accent-color:var(--accent)">
+      </div>
+      <div style="display:flex;gap:.6rem">
+        <button class="btn" id="crop-confirm-btn" onclick="confirmCrop()">Use Photo</button>
+        <button class="btn-ghost" onclick="closeCropModal()">Cancel</button>
+      </div>
+      <div class="msg" id="crop-msg" style="margin-top:.65rem"></div>
     </div>
   </div>
 </div>
@@ -534,12 +574,9 @@ const FIREBASE_CONFIG = {
   appId:"1:902138155809:web:0860c66b77d07746952460"
 };
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getFirestore,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp,runTransaction}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import{getStorage,ref as sRef,uploadBytesResumable,getDownloadURL}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-
+import{getFirestore,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,getDocs,onSnapshot,query,orderBy,serverTimestamp,runTransaction}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const app=initializeApp(FIREBASE_CONFIG);
 const db=getFirestore(app);
-const storage=getStorage(app);
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let players=[],matches=[],isAdmin=false,curProfileId=null;
@@ -579,18 +616,95 @@ onSnapshot(query(collection(db,'matches'),orderBy('date','desc')),snap=>{
 },err=>console.error(err));
 
 onSnapshot(doc(db,'config','decay'),snap=>{
-  if(snap.exists()){const d=snap.data();document.getElementById('decay-amount').value=d.amount||'7';document.getElementById('decay-unit').value=d.unit||'days';}
+  if(snap.exists()){
+    const d=snap.data();
+    const amt=d.amount||7, unt=d.unit||'days';
+    document.getElementById('decay-amount').value=amt;
+    // set the select correctly
+    const sel=document.getElementById('decay-unit');
+    if(sel){for(let o of sel.options){if(o.value===unt){o.selected=true;break;}}}
+  }
   applyDecayLocally();updateDecayStatus();
-  const di=document.getElementById('decay-info');
-  if(di){const a=document.getElementById('decay-amount').value||'7',u=document.getElementById('decay-unit').value||'days';di.textContent=`Decay period: ${a} ${u} · Max RD: 200 · Players hidden if RD > 100`;}
+  updateDecayInfo();
 });
-setInterval(updateDecayStatus,1000);setInterval(applyDecayLocally,5000);
+setInterval(updateDecayStatus,1000);
+setInterval(applyDecayLocally,5000);
+
+function updateDecayInfo(){
+  const di=document.getElementById('decay-info');
+  if(!di)return;
+  const a=document.getElementById('decay-amount').value||'7';
+  const u=document.getElementById('decay-unit').value||'days';
+  di.textContent=`Decay period: ${a} ${u} · Max RD: 200 · Players hidden if RD > 100`;
+}
 
 // ── DECAY ────────────────────────────────────────────────────────────────────
-function decayMs(){const a=parseFloat(document.getElementById('decay-amount').value)||7,u=document.getElementById('decay-unit').value||'days';if(u==='minutes')return a*6e4;if(u==='hours')return a*36e5;return a*864e5;}
-function computeDecay(p){const now=Date.now(),last=p.lastDecayAt||now,ms=decayMs(),per=Math.floor((now-last)/ms);if(per<=0)return null;let phi=p.rd/173.7178,phiMax=RD_MAX/173.7178;for(let i=0;i<per;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}return{newRD:Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10,newLast:last+per*ms};}
-function applyDecayLocally(){players.forEach(p=>{const r=computeDecay(p);if(!r)return;p.rd=r.newRD;p.lastDecayAt=r.newLast;updateDoc(doc(db,'players',p.firestoreId),{rd:r.newRD,lastDecayAt:r.newLast}).catch(()=>{});});}
-function updateDecayStatus(){const el=document.getElementById('decay-status');if(!el||!players.length)return;const ms=decayMs(),now=Date.now(),next=Math.min(...players.map(p=>(p.lastDecayAt||now)+ms-now));const a=document.getElementById('decay-amount').value||'7',u=document.getElementById('decay-unit').value||'days',lbl=a+u.charAt(0).toUpperCase();if(next>0){const h=Math.floor(next/36e5),m=Math.floor((next%36e5)/6e4),s=Math.floor((next%6e4)/1e3);el.textContent='DECAY·'+lbl+'·NEXT '+(h>0?h+'h'+m+'m':m+'m'+s+'s');}else el.textContent='DECAY·'+lbl;}
+function decayMs(){
+  const a=parseFloat(document.getElementById('decay-amount').value)||7;
+  const u=document.getElementById('decay-unit').value||'days';
+  if(u==='minutes')return a*6e4;
+  if(u==='hours')return a*36e5;
+  return a*864e5;
+}
+function computeDecay(p){
+  const now=Date.now(),last=p.lastDecayAt||now,ms=decayMs(),per=Math.floor((now-last)/ms);
+  if(per<=0)return null;
+  let phi=p.rd/173.7178,phiMax=RD_MAX/173.7178;
+  for(let i=0;i<per;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+  return{newRD:Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10,newLast:last+per*ms};
+}
+function applyDecayLocally(){
+  players.forEach(p=>{
+    const r=computeDecay(p);if(!r)return;
+    p.rd=r.newRD;p.lastDecayAt=r.newLast;
+    updateDoc(doc(db,'players',p.firestoreId),{rd:r.newRD,lastDecayAt:r.newLast}).catch(()=>{});
+  });
+}
+function updateDecayStatus(){
+  const el=document.getElementById('decay-status');
+  if(!el||!players.length)return;
+  const ms=decayMs(),now=Date.now();
+  const next=Math.min(...players.map(p=>(p.lastDecayAt||now)+ms-now));
+  const a=document.getElementById('decay-amount').value||'7';
+  const u=document.getElementById('decay-unit').value||'days';
+  const lbl=a+u.charAt(0).toUpperCase();
+  if(next>0){const h=Math.floor(next/36e5),m=Math.floor((next%36e5)/6e4),s=Math.floor((next%6e4)/1e3);el.textContent='DECAY·'+lbl+'·NEXT '+(h>0?h+'h'+m+'m':m+'m'+s+'s');}
+  else el.textContent='DECAY·'+lbl;
+}
+
+// ── DECAY SETTINGS ────────────────────────────────────────────────────────────
+window.saveDecay=async function(){
+  const amount=parseFloat(document.getElementById('decay-amount').value);
+  const unit=document.getElementById('decay-unit').value;
+  if(!amount||amount<=0){showMsg('decay-msg','Enter a valid period.',true);return;}
+  try{
+    await setDoc(doc(db,'config','decay'),{amount,unit});
+    showMsg('decay-msg',`Decay set to every ${amount} ${unit}.`);
+    updateDecayInfo();
+  }catch(e){showMsg('decay-msg','Error: '+e.message,true);}
+};
+
+// Helper used in adminRemoveMatch for the edge case of deleting the last match
+function playerStateFromHistory(allMatchesBefore, pid) {
+  // Walk matches in order and track this player's final state
+  let rating=1500, rd=120, wins=0, losses=0, lastMatchAt=null;
+  for(const m of allMatchesBefore){
+    if(m.p1id===pid){rating=m.p1newRating;rd=m.p1newRD;wins++;lastMatchAt=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();}
+    else if(m.p2id===pid){rating=m.p2newRating;rd=m.p2newRD;losses++;lastMatchAt=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();}
+  }
+  return{rating,rd,wins,losses,lastMatchAt};
+}
+
+// Helper: apply Glicko-2 RD decay for elapsed time since last match
+function applyDecayToPlayer(p, nowMs, periodMs){
+  if(!p.lastMatchAt||periodMs<=0)return;
+  const periods=Math.floor((nowMs-p.lastMatchAt)/periodMs);
+  if(periods<=0)return;
+  let phi=p.rd/173.7178;
+  const phiMax=RD_MAX/173.7178;
+  for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+  p.rd=Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10;
+}
 
 // ── GLICKO-2 ─────────────────────────────────────────────────────────────────
 const toG2=(r,rd)=>({mu:(r-1500)/173.7178,phi:rd/173.7178});
@@ -645,7 +759,6 @@ function makeCard(p){
   const rdH=p.rd>100,rdC=rdH?'var(--loss)':p.rd>80?'var(--accent)':'var(--win)';
   const{ls,la}=pStats(p.firestoreId),sc=ls>=5?'var(--win)':ls>=3?'var(--accent)':'var(--text)';
   const av=p.photoURL?`<img class="pc-avatar" src="${esc(p.photoURL)}" alt="">`:`<div class="pc-av-ph">${esc(p.name.charAt(0).toUpperCase())}</div>`;
-  // Season badges
   const seasons=p.seasons||[];
   let badgesHtml='',histHtml='';
   if(seasons.length){
@@ -654,7 +767,6 @@ function makeCard(p){
       const emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';
       return`<span class="s-badge ${cls}" title="${esc(s.seasonName||'Season')}">${emoji}${emoji?'':('#'+rk)} ${esc(s.seasonName||('S'+s.seasonNum))}</span>`;
     }).join('')+`</div>`;
-    // History dropdown
     const opts=seasons.slice().reverse().map((s,i)=>`<option value="${i}">${esc(s.seasonName||('Season '+s.seasonNum))} — #${s.rank}</option>`).join('');
     histHtml=`<div class="s-history-wrap">
       <select class="s-history-select" onchange="showSeasonData(this,'s-data-${p.firestoreId}')" onclick="event.stopPropagation()">
@@ -690,7 +802,6 @@ window.showSeasonData=function(sel,dataId){
   const el=document.getElementById(dataId);if(!el)return;
   if(!sel.value){el.style.display='none';return;}
   const idx=parseInt(sel.value);
-  // find the player
   const pid=dataId.replace('s-data-','');
   const p=players.find(x=>x.firestoreId===pid);
   if(!p||!p.seasons){el.style.display='none';return;}
@@ -705,6 +816,7 @@ window.showSeasonData=function(sel,dataId){
     Record: <strong>${s.wins}W – ${s.losses}L</strong><br>
     Season ended: ${ended}`;
 };
+
 function pStats(fid){
   const ids=new Set(players.map(x=>x.firestoreId));
   const pm=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)&&(m.p1id===fid||m.p2id===fid)).sort((a,b)=>toTs(a)-toTs(b));
@@ -739,9 +851,15 @@ setInterval(updateSeasonCountdown,1000);
 
 function updateSeasonCountdown(){
   const el=document.getElementById('season-countdown');
-  if(!el||!seasonConfig.deadline)return el&&(el.style.display='none');
+  if(!el||!seasonConfig.deadline){lockMatchForm(false);return el&&(el.style.display='none');}
   const now=Date.now(),dl=new Date(seasonConfig.deadline).getTime(),diff=dl-now;
-  if(diff<=0){el.textContent='SEASON ENDED';el.style.display='';el.className='';el.style.cssText='font-size:.55rem;color:var(--loss);font-family:\'DM Mono\',monospace;letter-spacing:.07em;white-space:nowrap;border:1px solid rgba(217,83,79,.4);padding:.25rem .5rem;';return;}
+  if(diff<=0){
+    el.textContent='SEASON ENDED';el.style.display='';el.className='';
+    el.style.cssText='font-size:.55rem;color:var(--loss);font-family:\'DM Mono\',monospace;letter-spacing:.07em;white-space:nowrap;border:1px solid rgba(217,83,79,.4);padding:.25rem .5rem;';
+    lockMatchForm(true);
+    return;
+  }
+  lockMatchForm(false);
   el.style.display='';
   const days=Math.floor(diff/864e5),hrs=Math.floor((diff%864e5)/36e5),mins=Math.floor((diff%36e5)/6e4),secs=Math.floor((diff%6e4)/1e3);
   const urgent=diff<86400000;
@@ -759,9 +877,6 @@ function populateSeasonAdmin(){
   }
   const sa=document.getElementById('season-status-admin');
   if(sa){
-    const di=document.getElementById('decay-info');
-    const a=document.getElementById('decay-amount').value||'7',u=document.getElementById('decay-unit').value||'days';
-    if(di)di.textContent=`Decay period: ${a} ${u} · Max RD: 200 · Players hidden if RD > 100`;
     if(seasonConfig.deadline){
       const dl=new Date(seasonConfig.deadline),now=Date.now(),diff=dl.getTime()-now;
       sa.style.display='block';
@@ -776,40 +891,92 @@ window.saveSeason=async function(){
   if(!dlRaw){showMsg('season-msg','Set a deadline date.',true);return;}
   const deadline=new Date(dlRaw).toISOString();
   try{
-    await setDoc(doc(db,'config','season'),{name:name||'Season',deadline,seasonNum:seasonConfig.seasonNum||1},);
+    await setDoc(doc(db,'config','season'),{name:name||'Season',deadline,seasonNum:seasonConfig.seasonNum||1});
     showMsg('season-msg','Season saved!');
   }catch(e){showMsg('season-msg','Error: '+e.message,true);}
 };
 
 window.triggerSeasonReset=async function(){
-  if(!confirm(`This will:\n1. Save each player's current rank/stats as a season record\n2. Reset ALL ratings to 1500, RD to 120, wins/losses to 0\n\nSeason: "${seasonConfig.name||'Current'}"\n\nThis cannot be undone. Continue?`))return;
-  const btn=document.getElementById('reset-season-btn');btn.disabled=true;btn.textContent='Resetting…';
+  if(!confirm(`This will:\n1. Save each player's rank, stats & full match history for this season\n2. Reset ALL ratings to 1500, RD to 120, wins/losses to 0\n3. Clear all matches from the active log\n\nSeason: "${seasonConfig.name||'Current'}"\n\nThis cannot be undone. Continue?`))return;
+  const btn=document.getElementById('reset-season-btn');btn.disabled=true;btn.textContent='Archiving…';
   try{
-    // Snapshot current leaderboard rankings
-    const ranked=[...players].filter(p=>p.rd<=100).sort((a,b)=>b.rating-a.rating);
-    const rankMap={};ranked.forEach((p,i)=>rankMap[p.firestoreId]=i+1);
-    // Unranked players get rank = ranked.length + 1
-    players.forEach(p=>{if(!rankMap[p.firestoreId])rankMap[p.firestoreId]=ranked.length+1;});
     const sNum=seasonConfig.seasonNum||1;
     const sName=seasonConfig.name||('Season '+sNum);
     const endedAt=new Date().toISOString();
-    // Update each player in a batch via individual updates
-    await Promise.all(players.map(p=>{
+
+    // 1. Rank players
+    const ranked=[...players].filter(p=>p.rd<=100).sort((a,b)=>b.rating-a.rating);
+    const rankMap={};ranked.forEach((p,i)=>rankMap[p.firestoreId]=i+1);
+    players.forEach(p=>{if(!rankMap[p.firestoreId])rankMap[p.firestoreId]=ranked.length+1;});
+
+    // 2. Fetch all current matches
+    const matchesSnap=await getDocs(query(collection(db,'matches'),orderBy('date','asc')));
+    const allMatches=matchesSnap.docs.map(d=>({firestoreId:d.id,...d.data()}));
+
+    // 3. For each player, save their season matches into a subcollection
+    //    players/{pid}/seasonMatches/{sNum}/matches (stored as array on a single doc to keep reads simple)
+    await Promise.all(players.map(async p=>{
+      const pid=p.firestoreId;
+      const myMatches=allMatches
+        .filter(m=>m.p1id===pid||m.p2id===pid)
+        .map(m=>({
+          opponent:m.p1id===pid?m.p2name:m.p1name,
+          won:m.winnerId===pid,
+          matchScore:m.matchScore||null,
+          delta:m.p1id===pid?m.p1delta:m.p2delta,
+          oldRating:m.p1id===pid?m.p1oldRating:m.p2oldRating,
+          newRating:m.p1id===pid?m.p1newRating:m.p2newRating,
+          date:m.date?.toDate?m.date.toDate().toISOString():new Date(m.date).toISOString(),
+        }));
+      // Save match archive doc
+      await setDoc(doc(db,'players',pid,'seasonMatches',String(sNum)),{
+        seasonNum:sNum,seasonName:sName,endedAt,matches:myMatches
+      });
+      // Update player doc: season summary + reset stats
       const existing=p.seasons||[];
-      const entry={seasonNum:sNum,seasonName:sName,rank:rankMap[p.firestoreId],rating:p.rating,rd:p.rd,wins:p.wins,losses:p.losses,endedAt};
-      return updateDoc(doc(db,'players',p.firestoreId),{rating:1500,rd:120,wins:0,losses:0,lastDecayAt:Date.now(),seasons:[...existing,entry]});
+      const entry={seasonNum:sNum,seasonName:sName,rank:rankMap[pid],rating:p.rating,rd:p.rd,wins:p.wins,losses:p.losses,endedAt};
+      return updateDoc(doc(db,'players',pid),{
+        rating:1500,rd:120,wins:0,losses:0,lastDecayAt:Date.now(),
+        seasons:[...existing,entry]
+      });
     }));
-    // Bump season number, clear deadline
+
+    // 4. Delete all match documents
+    await Promise.all(matchesSnap.docs.map(d=>deleteDoc(doc(db,'matches',d.id))));
+
+    // 5. Bump season number, clear deadline
     await setDoc(doc(db,'config','season'),{name:'',deadline:null,seasonNum:sNum+1});
-    showMsg('season-msg',`Season "${sName}" archived! All ratings reset.`);
+    showMsg('season-msg',`Season "${sName}" archived with full match history! All stats reset.`);
   }catch(e){showMsg('season-msg','Error: '+e.message,true);}
   finally{btn.disabled=false;btn.textContent='⚡ Reset Season Now';}
 };
 
-// ── DECAY (read-only display now) ─────────────────────────────────────────────
+// ── MATCH LOCK ────────────────────────────────────────────────────────────────
+function lockMatchForm(locked){
+  const btn=document.getElementById('submit-match-btn');
+  const panel=document.getElementById('panel-match');
+  if(!btn||!panel)return;
+  btn.disabled=locked;
+  let notice=document.getElementById('match-lock-notice');
+  if(locked){
+    if(!notice){
+      notice=document.createElement('div');
+      notice.id='match-lock-notice';
+      notice.style.cssText='font-family:\'DM Mono\',monospace;font-size:.68rem;color:var(--loss);border:1px solid rgba(217,83,79,.3);background:rgba(217,83,79,.07);padding:.75rem 1rem;margin-bottom:1rem;letter-spacing:.04em;';
+      notice.textContent='⚠ Season has ended. Match submission is locked until the admin resets the season.';
+      panel.querySelector('.form-card').prepend(notice);
+    }
+  } else {
+    if(notice)notice.remove();
+  }
+}
 
 // ── SUBMIT MATCH ─────────────────────────────────────────────────────────────
 window.submitMatch=async function(){
+  if(seasonConfig.deadline){
+    const diff=new Date(seasonConfig.deadline).getTime()-Date.now();
+    if(diff<=0){showMsg('match-msg','Season has ended. No matches can be submitted until the admin resets the season.',true);return;}
+  }
   const wid=document.getElementById('match-winner').value,lid=document.getElementById('match-loser').value;
   if(wid===lid){showMsg('match-msg','Select two different players.',true);return;}
   const btn=document.getElementById('submit-match-btn');btn.disabled=true;showMsg('match-msg','Submitting…');
@@ -826,10 +993,18 @@ window.submitMatch=async function(){
   });document.getElementById('match-score').value='';const wn=players.find(p=>p.firestoreId===wid);showMsg('match-msg',(wn?.name||'Winner')+' wins!');}
   catch(e){showMsg('match-msg','Error: '+e.message,true);}finally{btn.disabled=false;}
 };
-function renderMatchSelects(){const opts=players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)} (${Math.round(p.rating)})</option>`).join('');document.getElementById('match-winner').innerHTML=opts||'<option disabled>No players yet</option>';document.getElementById('match-loser').innerHTML=opts||'<option disabled>No players yet</option>';}
+function renderMatchSelects(){
+  const opts=players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)} (${Math.round(p.rating)})</option>`).join('');
+  document.getElementById('match-winner').innerHTML=opts||'<option disabled>No players yet</option>';
+  document.getElementById('match-loser').innerHTML=opts||'<option disabled>No players yet</option>';
+}
 
 // ── HISTORY ──────────────────────────────────────────────────────────────────
-function renderHistoryFilter(){const sel=document.getElementById('history-filter'),cur=sel.value;sel.innerHTML='<option value="all">All Players</option>'+players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)}</option>`).join('');sel.value=players.find(p=>p.firestoreId===cur)?cur:'all';}
+function renderHistoryFilter(){
+  const sel=document.getElementById('history-filter'),cur=sel.value;
+  sel.innerHTML='<option value="all">All Players</option>'+players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)}</option>`).join('');
+  sel.value=players.find(p=>p.firestoreId===cur)?cur:'all';
+}
 window.renderHistory=function(){
   renderHistoryFilter();const flt=document.getElementById('history-filter').value,el=document.getElementById('history-list');
   const ids=new Set(players.map(p=>p.firestoreId));
@@ -852,8 +1027,7 @@ window.renderHistory=function(){
 function renderAdminPanel(){
   if(!isAdmin)return;
   populateSeasonAdmin();
-  const di=document.getElementById('decay-info');
-  if(di){const a=document.getElementById('decay-amount').value||'7',u=document.getElementById('decay-unit').value||'days';di.textContent=`Decay period: ${a} ${u} · Max RD: 200 · Players hidden if RD > 100`;}
+  updateDecayInfo();
   const sorted=[...players].sort((a,b)=>b.rating-a.rating);
   const pl=document.getElementById('admin-players-list');
   if(pl)pl.innerHTML=sorted.length?sorted.map(p=>`<div class="admin-prow"><span class="admin-pname">${esc(p.name)}</span><span class="admin-prating">${Math.round(p.rating)} ±${Math.round(p.rd)}</span><button class="btn-admin" onclick="openEditPlayer('${p.firestoreId}')">Edit Stats</button><button class="btn-danger" onclick="adminRemovePlayer('${p.firestoreId}','${esc(p.name)}')">Remove</button></div>`).join(''):'<div class="empty">No players.</div>';
@@ -863,9 +1037,142 @@ function renderAdminPanel(){
     return`<div class="admin-mrow"><div class="admin-minfo"><strong>${esc(m.p1name)} beat ${esc(m.p2name)}</strong>${m.matchScore?' · '+esc(m.matchScore):''}<br>${ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div><button class="btn-danger" onclick="adminRemoveMatch('${m.firestoreId}')">Delete</button></div>`;
   }).join(''):'<div class="empty">No matches.</div>';
 }
-window.adminRemovePlayer=async function(fid,name){if(!confirm(`Remove "${name}"? Match history remains.`))return;try{await deleteDoc(doc(db,'players',fid));}catch(e){alert('Error: '+e.message);}};
-window.adminRemoveMatch=async function(fid){if(!confirm('Delete this match? Ratings will NOT be recalculated.'))return;try{await deleteDoc(doc(db,'matches',fid));}catch(e){alert('Error: '+e.message);}};
-window.openEditPlayer=function(fid){const p=players.find(x=>x.firestoreId===fid);if(!p)return;document.getElementById('edit-pid').value=fid;document.getElementById('edit-rating').value=Math.round(p.rating);document.getElementById('edit-rd').value=Math.round(p.rd);document.getElementById('edit-wins').value=p.wins;document.getElementById('edit-losses').value=p.losses;document.getElementById('edit-player-msg').style.display='none';document.getElementById('admin-edit-overlay').classList.add('open');};
+
+window.adminRemovePlayer=async function(fid,name){
+  if(!confirm(`Remove "${name}"? Match history remains.`))return;
+  try{await deleteDoc(doc(db,'players',fid));}catch(e){alert('Error: '+e.message);}
+};
+
+window.adminRemoveMatch=async function(fid){
+  if(!confirm('Delete this match and recalculate all affected ratings?'))return;
+
+  try{
+    // 1. Fetch all matches in chronological order BEFORE deleting
+    const matchesSnap=await getDocs(query(collection(db,'matches'),orderBy('date','asc')));
+    const allMatches=matchesSnap.docs.map(d=>({firestoreId:d.id,...d.data()}));
+
+    // 2. Find position of the match being deleted
+    const deletedIdx=allMatches.findIndex(m=>m.firestoreId===fid);
+    if(deletedIdx===-1){alert('Match not found.');return;}
+    const deletedMatch=allMatches[deletedIdx];
+
+    // 3. Delete it
+    await deleteDoc(doc(db,'matches',fid));
+
+    const matchesBefore=allMatches.slice(0,deletedIdx);
+    const matchesAfter=allMatches.slice(deletedIdx+1);
+
+    // 4. Fetch all players
+    const playersSnap=await getDocs(collection(db,'players'));
+
+    // 5. Build player state map — seed from baseline, then fast-forward using saved match records
+    const playerMap={};
+    playersSnap.docs.forEach(d=>{
+      playerMap[d.id]={
+        firestoreId:d.id,...d.data(),
+        rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null
+      };
+    });
+
+    // Reconstruct state before the deleted match using stored match outcomes
+    for(const m of matchesBefore){
+      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+      if(playerMap[m.p1id]){
+        playerMap[m.p1id].rating=m.p1newRating;
+        playerMap[m.p1id].rd=m.p1newRD;
+        playerMap[m.p1id].wins=(playerMap[m.p1id].wins||0)+1;
+        playerMap[m.p1id].lastMatchAt=ts;
+      }
+      if(playerMap[m.p2id]){
+        playerMap[m.p2id].rating=m.p2newRating;
+        playerMap[m.p2id].rd=m.p2newRD;
+        playerMap[m.p2id].losses=(playerMap[m.p2id].losses||0)+1;
+        playerMap[m.p2id].lastMatchAt=ts;
+      }
+    }
+
+    // 6. If no matches after, just rewind the two involved players and done
+    if(matchesAfter.length===0){
+      const wState=playerStateFromHistory(matchesBefore,deletedMatch.p1id);
+      const lState=playerStateFromHistory(matchesBefore,deletedMatch.p2id);
+      await Promise.all([
+        updateDoc(doc(db,'players',deletedMatch.p1id),{rating:wState.rating,rd:wState.rd,wins:wState.wins,losses:wState.losses,lastDecayAt:wState.lastMatchAt||Date.now()}),
+        updateDoc(doc(db,'players',deletedMatch.p2id),{rating:lState.rating,rd:lState.rd,wins:lState.wins,losses:lState.losses,lastDecayAt:lState.lastMatchAt||Date.now()}),
+      ]);
+      alert('Match deleted. Ratings rewound to previous state.');
+      return;
+    }
+
+    // 7. Replay matches after the deleted one, applying RD decay between matches
+    const periodMs=decayMs();
+    const matchUpdates=[];
+
+    for(const m of matchesAfter){
+      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+      const w=playerMap[m.p1id];
+      const l=playerMap[m.p2id];
+      if(!w||!l)continue;
+
+      // Apply time-based RD decay since each player's last activity
+      applyDecayToPlayer(w,ts,periodMs);
+      applyDecayToPlayer(l,ts,periodMs);
+
+      const uw=g2Update(w,[{rating:l.rating,rd:l.rd,s:1}]);
+      const ul=g2Update(l,[{rating:w.rating,rd:w.rd,s:0}]);
+
+      const p1delta=Math.round((uw.rating-w.rating)*10)/10;
+      const p2delta=Math.round((ul.rating-l.rating)*10)/10;
+
+      // Update in-memory state for subsequent matches
+      playerMap[m.p1id].rating=uw.rating;
+      playerMap[m.p1id].rd=uw.rd;
+      playerMap[m.p1id].wins=(playerMap[m.p1id].wins||0)+1;
+      playerMap[m.p1id].lastMatchAt=ts;
+
+      playerMap[m.p2id].rating=ul.rating;
+      playerMap[m.p2id].rd=ul.rd;
+      playerMap[m.p2id].losses=(playerMap[m.p2id].losses||0)+1;
+      playerMap[m.p2id].lastMatchAt=ts;
+
+      // Update match record with recalculated deltas and ratings
+      matchUpdates.push(updateDoc(doc(db,'matches',m.firestoreId),{
+        p1delta,p2delta,
+        p1oldRating:w.rating,p1newRating:uw.rating,
+        p2oldRating:l.rating,p2newRating:ul.rating,
+        p1newRD:uw.rd,p2newRD:ul.rd,
+      }));
+    }
+
+    // 8. Write all final player states
+    const playerUpdates=Object.values(playerMap).map(p=>
+      updateDoc(doc(db,'players',p.firestoreId),{
+        rating:p.rating,
+        rd:p.rd,
+        wins:p.wins||0,
+        losses:p.losses||0,
+        lastDecayAt:p.lastMatchAt||Date.now(),
+      })
+    );
+
+    await Promise.all([...playerUpdates,...matchUpdates]);
+    alert('Match deleted and ratings recalculated from that point forward.');
+
+  }catch(e){
+    alert('Error: '+e.message);
+    console.error(e);
+  }
+};
+
+window.openEditPlayer=function(fid){
+  const p=players.find(x=>x.firestoreId===fid);if(!p)return;
+  document.getElementById('edit-pid').value=fid;
+  document.getElementById('edit-rating').value=Math.round(p.rating);
+  document.getElementById('edit-rd').value=Math.round(p.rd);
+  document.getElementById('edit-wins').value=p.wins;
+  document.getElementById('edit-losses').value=p.losses;
+  document.getElementById('edit-player-msg').style.display='none';
+  document.getElementById('admin-edit-overlay').classList.add('open');
+};
 window.submitEditPlayer=async function(){
   const fid=document.getElementById('edit-pid').value,rating=parseFloat(document.getElementById('edit-rating').value),rd=parseFloat(document.getElementById('edit-rd').value),wins=parseInt(document.getElementById('edit-wins').value),losses=parseInt(document.getElementById('edit-losses').value);
   if([rating,rd,wins,losses].some(isNaN)){showMsg('edit-player-msg','Invalid values.',true);return;}
@@ -873,25 +1180,148 @@ window.submitEditPlayer=async function(){
   catch(e){showMsg('edit-player-msg','Error: '+e.message,true);}
 };
 
-// ── PROFILE PICTURE ──────────────────────────────────────────────────────────
-document.getElementById('m-av-input').addEventListener('change',async function(e){
-  const file=e.target.files[0];if(!file||!curProfileId)return;
-  const prog=document.getElementById('upload-prog');prog.style.display='block';prog.textContent='Uploading…';
-  const ext=file.name.split('.').pop(),sr=sRef(storage,`avatars/${curProfileId}.${ext}`);
-  const task=uploadBytesResumable(sr,file,{contentType:file.type});
-  task.on('state_changed',snap=>{prog.textContent=`Uploading… ${Math.round(snap.bytesTransferred/snap.totalBytes*100)}%`;},
-    err=>{prog.textContent='Upload failed.';console.error(err);},
-    async()=>{const url=await getDownloadURL(task.snapshot.ref);await updateDoc(doc(db,'players',curProfileId),{photoURL:url});prog.textContent='Photo updated!';
-      const wrap=document.getElementById('m-av-wrap'),uploadBtn=wrap.querySelector('.m-av-upload');
-      let img=wrap.querySelector('.m-avatar');if(!img){img=document.createElement('img');img.className='m-avatar';const ph=wrap.querySelector('.m-av-ph');if(ph)ph.replaceWith(img);else wrap.insertBefore(img,uploadBtn);}img.src=url;
-      setTimeout(()=>{prog.style.display='none';},2500);
-    });
+// ── PROFILE PICTURE — CROP & RESIZE ──────────────────────────────────────────
+const MAX_FILE_MB=5;
+const OUT_SIZE=400;
+let cropState={file:null,imgW:0,imgH:0,scale:1,minScale:1,ox:0,oy:0};
+
+document.getElementById('m-av-input').addEventListener('change',function(e){
+  const file=e.target.files[0];
+  this.value='';
+  if(!file)return;
+  if(!file.type.startsWith('image/')){showUploadErr('Only image files are supported.');return;}
+  if(file.size>MAX_FILE_MB*1024*1024){showUploadErr(`File too large (max ${MAX_FILE_MB}MB).`);return;}
+  openCropModal(file);
 });
 
+function showUploadErr(msg){
+  const prog=document.getElementById('upload-prog');
+  prog.style.display='block';prog.style.color='var(--loss)';prog.textContent='⚠ '+msg;
+  setTimeout(()=>{prog.style.display='none';prog.style.color='';},4000);
+}
+
+function openCropModal(file){
+  cropState.file=file;
+  const url=URL.createObjectURL(file);
+  const img=document.getElementById('crop-img');
+  img.onload=()=>{
+    cropState.imgW=img.naturalWidth;cropState.imgH=img.naturalHeight;
+    const vp=240;
+    const minS=Math.max(vp/cropState.imgW,vp/cropState.imgH);
+    cropState.minScale=minS;cropState.scale=minS;
+    cropState.ox=(vp-cropState.imgW*minS)/2;cropState.oy=(vp-cropState.imgH*minS)/2;
+    applyCropTransform();
+    document.getElementById('crop-zoom').min=minS;document.getElementById('crop-zoom').max=minS*4;
+    document.getElementById('crop-zoom').step=minS*0.005;document.getElementById('crop-zoom').value=minS;
+    document.getElementById('crop-msg').style.display='none';document.getElementById('crop-confirm-btn').disabled=false;
+  };
+  img.src=url;
+  document.getElementById('crop-overlay').classList.add('open');
+}
+
+window.closeCropModal=function(){
+  document.getElementById('crop-overlay').classList.remove('open');
+  const img=document.getElementById('crop-img');
+  if(img.src.startsWith('blob:'))URL.revokeObjectURL(img.src);
+};
+
+function applyCropTransform(){
+  const img=document.getElementById('crop-img');
+  img.style.width=cropState.imgW+'px';img.style.height=cropState.imgH+'px';
+  img.style.transform=`translate(${cropState.ox}px,${cropState.oy}px) scale(${cropState.scale})`;
+}
+
+function clampOffsets(){
+  const vp=240,s=cropState.scale,iw=cropState.imgW,ih=cropState.imgH;
+  const minX=vp-iw*s,minY=vp-ih*s;
+  cropState.ox=Math.min(0,Math.max(minX,cropState.ox));
+  cropState.oy=Math.min(0,Math.max(minY,cropState.oy));
+}
+
+document.getElementById('crop-zoom').addEventListener('input',function(){
+  const newS=parseFloat(this.value),vp=240;
+  const cx=vp/2,cy=vp/2;
+  const imgCx=(cx-cropState.ox)/cropState.scale,imgCy=(cy-cropState.oy)/cropState.scale;
+  cropState.scale=newS;cropState.ox=cx-imgCx*newS;cropState.oy=cy-imgCy*newS;
+  clampOffsets();applyCropTransform();
+});
+
+(function(){
+  const vp=document.getElementById('crop-viewport');
+  let dragging=false,startX,startY,startOx,startOy;
+  vp.addEventListener('mousedown',e=>{dragging=true;startX=e.clientX;startY=e.clientY;startOx=cropState.ox;startOy=cropState.oy;vp.style.cursor='grabbing';e.preventDefault();});
+  window.addEventListener('mousemove',e=>{if(!dragging)return;cropState.ox=startOx+(e.clientX-startX);cropState.oy=startOy+(e.clientY-startY);clampOffsets();applyCropTransform();});
+  window.addEventListener('mouseup',()=>{dragging=false;vp.style.cursor='grab';});
+  let lastTouches=null;
+  vp.addEventListener('touchstart',e=>{lastTouches=e.touches;if(e.touches.length===1){startX=e.touches[0].clientX;startY=e.touches[0].clientY;startOx=cropState.ox;startOy=cropState.oy;}e.preventDefault();},{passive:false});
+  vp.addEventListener('touchmove',e=>{
+    if(e.touches.length===1&&lastTouches?.length===1){cropState.ox=startOx+(e.touches[0].clientX-startX);cropState.oy=startOy+(e.touches[0].clientY-startY);clampOffsets();applyCropTransform();}
+    else if(e.touches.length===2&&lastTouches?.length===2){
+      const d0=Math.hypot(lastTouches[0].clientX-lastTouches[1].clientX,lastTouches[0].clientY-lastTouches[1].clientY);
+      const d1=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      const factor=d1/d0;
+      const newS=Math.min(Math.max(cropState.scale*factor,cropState.minScale),cropState.minScale*4);
+      const vp2=240,cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const rect=document.getElementById('crop-viewport').getBoundingClientRect();
+      const lcx=cx-rect.left,lcy=cy-rect.top;
+      const imgCx=(lcx-cropState.ox)/cropState.scale,imgCy=(lcy-cropState.oy)/cropState.scale;
+      cropState.scale=newS;cropState.ox=lcx-imgCx*newS;cropState.oy=lcy-imgCy*newS;clampOffsets();applyCropTransform();
+      document.getElementById('crop-zoom').value=newS;
+    }
+    lastTouches=e.touches;e.preventDefault();
+  },{passive:false});
+  vp.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const factor=e.deltaY<0?1.08:0.93;
+    const newS=Math.min(Math.max(cropState.scale*factor,cropState.minScale),cropState.minScale*4);
+    const rect=vp.getBoundingClientRect();
+    const lcx=e.clientX-rect.left,lcy=e.clientY-rect.top;
+    const imgCx=(lcx-cropState.ox)/cropState.scale,imgCy=(lcy-cropState.oy)/cropState.scale;
+    cropState.scale=newS;cropState.ox=lcx-imgCx*newS;cropState.oy=lcy-imgCy*newS;clampOffsets();applyCropTransform();
+    document.getElementById('crop-zoom').value=newS;
+  },{passive:false});
+})();
+
+window.confirmCrop=async function(){
+  const btn=document.getElementById('crop-confirm-btn');
+  btn.disabled=true;btn.textContent='Processing…';
+  try{
+    const img=document.getElementById('crop-img');
+    const vp=240;
+    const canvas=document.createElement('canvas');
+    canvas.width=OUT_SIZE;canvas.height=OUT_SIZE;
+    const ctx=canvas.getContext('2d');
+    const srcX=-cropState.ox/cropState.scale;
+    const srcY=-cropState.oy/cropState.scale;
+    const srcW=vp/cropState.scale;
+    const srcH=vp/cropState.scale;
+    ctx.drawImage(img,srcX,srcY,srcW,srcH,0,0,OUT_SIZE,OUT_SIZE);
+    // Save as base64 directly into Firestore — no Storage bucket needed
+    const base64=canvas.toDataURL('image/jpeg',0.82);
+    closeCropModal();
+    if(!curProfileId)return;
+    const prog=document.getElementById('upload-prog');
+    prog.style.color='';prog.style.display='block';prog.textContent='Saving…';
+    await updateDoc(doc(db,'players',curProfileId),{photoURL:base64});
+    prog.textContent='Photo updated!';
+    const wrap=document.getElementById('m-av-wrap'),uploadBtn=wrap.querySelector('.m-av-upload');
+    let avImg=wrap.querySelector('.m-avatar');
+    if(!avImg){avImg=document.createElement('img');avImg.className='m-avatar';const ph=wrap.querySelector('.m-av-ph');if(ph)ph.replaceWith(avImg);else wrap.insertBefore(avImg,uploadBtn);}
+    avImg.src=base64;
+    setTimeout(()=>{prog.style.display='none';},2500);
+    btn.disabled=false;btn.textContent='Use Photo';
+  }catch(err){
+    console.error(err);
+    document.getElementById('crop-msg').textContent='Error: '+err.message;
+    document.getElementById('crop-msg').className='msg err';
+    document.getElementById('crop-msg').style.display='block';
+    btn.disabled=false;btn.textContent='Use Photo';
+  }
+};
+
 // ── PROFILE MODAL ────────────────────────────────────────────────────────────
-window.openProfile=function(fid){
+window.openProfile=async function(fid){
   const p=players.find(x=>x.firestoreId===fid);if(!p)return;curProfileId=fid;
-  // Avatar
   const wrap=document.getElementById('m-av-wrap'),uploadBtn=wrap.querySelector('.m-av-upload');
   const old=wrap.querySelector('.m-avatar,.m-av-ph');if(old)old.remove();
   if(p.photoURL){const img=document.createElement('img');img.className='m-avatar';img.src=p.photoURL;wrap.insertBefore(img,uploadBtn);}
@@ -912,18 +1342,86 @@ window.openProfile=function(fid){
     <div class="m-stat"><span class="m-stat-l">Win%</span><span class="m-stat-v ${wc}">${wr}%</span></div>
     <div class="m-stat"><span class="m-stat-l">Streak</span><span class="m-stat-v ${ls>=5?'green':ls>=3?'':'neutral'}">${ls>0?ls+'W':'—'}</span></div>
     <div class="m-stat"><span class="m-stat-l">Longest #1</span><span class="m-stat-v" style="color:var(--accent3);font-size:1rem">${fmtDur(la)}</span></div>`;
+
+  // Current season matches
   const ids=new Set(players.map(x=>x.firestoreId));
   const pm=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)&&(m.p1id===fid||m.p2id===fid)).sort((a,b)=>toTs(a)-toTs(b));
   const start=pm.length>0?(pm[0].p1id===fid?pm[0].p1oldRating:pm[0].p2oldRating):p.rating;
   const pts=[{rating:start,label:'Start'}];
   pm.forEach(m=>{const i1=m.p1id===fid,ts=m.date?.toDate?m.date.toDate():new Date(m.date);pts.push({rating:i1?m.p1newRating:m.p2newRating,won:m.winnerId===fid,label:i1?m.p2name:m.p1name,date:ts.toISOString()});});
   drawChart(pts);
-  document.getElementById('profile-matches').innerHTML=pm.length?[...pm].reverse().map(m=>{
-    const i1=m.p1id===fid,won=i1?m.score===1:m.score===0,opp=i1?m.p2name:m.p1name,delta=i1?m.p1delta:m.p2delta,oldR=i1?m.p1oldRating:m.p2oldRating,newR=i1?m.p1newRating:m.p2newRating;
-    const ts=m.date?.toDate?m.date.toDate():new Date(m.date),ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),ti=ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),df=(delta>=0?'+':'')+delta;
-    return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds} · ${ti}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${Math.round(oldR)}→${Math.round(newR)}</span></span></div>`;
-  }).join(''):'<div class="empty">No matches yet.</div>';
+
+  function renderCurrentMatches(){
+    return pm.length?[...pm].reverse().map(m=>{
+      const i1=m.p1id===fid,won=i1?m.score===1:m.score===0,opp=i1?m.p2name:m.p1name,delta=i1?m.p1delta:m.p2delta,oldR=i1?m.p1oldRating:m.p2oldRating,newR=i1?m.p1newRating:m.p2newRating;
+      const ts=m.date?.toDate?m.date.toDate():new Date(m.date),ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),ti=ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),df=(delta>=0?'+':'')+delta;
+      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds} · ${ti}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${Math.round(oldR)}→${Math.round(newR)}</span></span></div>`;
+    }).join(''):'<div class="empty">No matches this season yet.</div>';
+  }
+
+  // Build season selector if player has past seasons
+  const seasons=p.seasons||[];
+  let seasonSelectorHtml='';
+  if(seasons.length){
+    const opts=seasons.slice().reverse().map(s=>{
+      const emoji=s.rank===1?'🥇':s.rank===2?'🥈':s.rank===3?'🥉':'';
+      return`<option value="${s.seasonNum}">${emoji}${esc(s.seasonName||('Season '+s.seasonNum))} — #${s.rank}</option>`;
+    }).join('');
+    seasonSelectorHtml=`<div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.75rem;flex-wrap:wrap">
+      <div class="chart-lbl" style="margin:0">Match History</div>
+      <select id="profile-season-sel" style="width:auto;flex:1;min-width:160px;font-size:.68rem;padding:.35rem .65rem" onchange="loadProfileSeason('${fid}',this.value)">
+        <option value="current">📅 Current Season</option>
+        ${opts}
+      </select>
+    </div>`;
+  } else {
+    seasonSelectorHtml=`<div class="chart-lbl" style="margin-bottom:.65rem">Match History</div>`;
+  }
+
+  document.getElementById('profile-matches').innerHTML=`${seasonSelectorHtml}<div id="profile-matches-list">${renderCurrentMatches()}</div>`;
   document.getElementById('profile-overlay').classList.add('open');
+};
+
+window.loadProfileSeason=async function(fid,val){
+  const el=document.getElementById('profile-matches-list');
+  if(val==='current'){
+    // Re-render current season matches
+    const ids=new Set(players.map(x=>x.firestoreId));
+    const pm=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)&&(m.p1id===fid||m.p2id===fid)).sort((a,b)=>toTs(b)-toTs(a));
+    el.innerHTML=pm.length?pm.map(m=>{
+      const i1=m.p1id===fid,won=i1?m.score===1:m.score===0,opp=i1?m.p2name:m.p1name,delta=i1?m.p1delta:m.p2delta,oldR=i1?m.p1oldRating:m.p2oldRating,newR=i1?m.p1newRating:m.p2newRating;
+      const ts=m.date?.toDate?m.date.toDate():new Date(m.date),ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),df=(delta>=0?'+':'')+delta;
+      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${Math.round(oldR)}→${Math.round(newR)}</span></span></div>`;
+    }).join(''):'<div class="empty">No matches this season yet.</div>';
+    return;
+  }
+  // Load archived season matches from subcollection
+  el.innerHTML='<div class="loading" style="padding:1.5rem">Loading</div>';
+  try{
+    const snap=await getDocs(collection(db,'players',fid,'seasonMatches'));
+    const archiveDoc=snap.docs.find(d=>d.id===String(val));
+    if(!archiveDoc){el.innerHTML='<div class="empty">No match data saved for this season.</div>';return;}
+    const data=archiveDoc.data();
+    const ms=data.matches||[];
+    if(!ms.length){el.innerHTML='<div class="empty">No matches recorded for this season.</div>';return;}
+    // Sort most recent first
+    const sorted=[...ms].sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const p=players.find(x=>x.firestoreId===fid);
+    const sEntry=(p?.seasons||[]).find(s=>s.seasonNum===parseInt(val));
+    let headerHtml='';
+    if(sEntry){
+      const emoji=sEntry.rank===1?'🥇':sEntry.rank===2?'🥈':sEntry.rank===3?'🥉':'';
+      const ended=sEntry.endedAt?new Date(sEntry.endedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+      headerHtml=`<div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);padding:.55rem .75rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.65rem;line-height:1.8">
+        ${emoji} <strong style="color:var(--text)">${esc(sEntry.seasonName||'Season '+sEntry.seasonNum)}</strong> · Final rank <strong style="color:var(--accent)">#${sEntry.rank}</strong> · ${sEntry.wins}W–${sEntry.losses}L · Rating <strong style="color:var(--accent)">${Math.round(sEntry.rating)}</strong>${ended?' · Ended '+ended:''}
+      </div>`;
+    }
+    el.innerHTML=headerHtml+sorted.map(m=>{
+      const ds=new Date(m.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      const df=(m.delta>=0?'+':'')+m.delta;
+      return`<div class="pm-row"><span class="pm-badge ${m.won?'win':'loss'}">${m.won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(m.opponent)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds}</span></div><span class="pm-delta ${m.delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${Math.round(m.oldRating)}→${Math.round(m.newRating)}</span></span></div>`;
+    }).join('');
+  }catch(e){el.innerHTML=`<div class="empty">Error loading: ${esc(e.message)}</div>`;}
 };
 
 window.saveQuoteModal=async function(){
@@ -935,7 +1433,7 @@ window.saveQuoteModal=async function(){
 };
 
 window.closeProfile=function(e){if(e.target===document.getElementById('profile-overlay'))document.getElementById('profile-overlay').classList.remove('open');};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){['profile-overlay','admin-login-overlay','admin-edit-overlay'].forEach(id=>document.getElementById(id).classList.remove('open'));}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){['profile-overlay','admin-login-overlay','admin-edit-overlay','crop-overlay'].forEach(id=>document.getElementById(id).classList.remove('open'));}});
 
 // ── CHART ────────────────────────────────────────────────────────────────────
 function drawChart(points){
@@ -966,7 +1464,15 @@ function drawChart(points){
 }
 
 // ── NAV ──────────────────────────────────────────────────────────────────────
-window.showPanel=function(id,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+id).classList.add('active');btn.classList.add('active');if(id==='players')renderPlayersList();if(id==='history')renderHistory();if(id==='admin')renderAdminPanel();};
+window.showPanel=function(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='players')renderPlayersList();
+  if(id==='history')renderHistory();
+  if(id==='admin')renderAdminPanel();
+};
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
