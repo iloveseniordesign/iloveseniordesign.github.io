@@ -1,107 +1,1198 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTTIW - Table Tennis Tracker</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;700;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GLICKO-2 LEADERBOARD</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #e8ff47;
+    --accent2: #ff4757;
+    --accent3: #47b8ff;
+    --text: #e0e0f0;
+    --muted: #5a5a7a;
+    --win: #47ffb8;
+    --loss: #ff4757;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(232,255,71,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(71,184,255,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── SYNC INDICATOR ── */
+  #sync-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--win);
+    margin-right: 5px;
+    vertical-align: middle;
+    transition: background 0.3s;
+  }
+  #sync-dot.syncing { background: var(--accent); animation: pulse 0.8s infinite alternate; }
+  #sync-dot.error   { background: var(--loss); animation: none; }
+  @keyframes pulse { from { opacity: 1; } to { opacity: 0.3; } }
+
+  header {
+    padding: 2rem 3rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    position: relative;
+    z-index: 1;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    line-height: 1;
+  }
+  header span {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  nav {
+    display: flex;
+    gap: 0;
+    padding: 0 3rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 1;
+  }
+  nav button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav button:hover:not(.active) { color: var(--text); }
+
+  main {
+    padding: 2rem 3rem;
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* CONFIG BANNER */
+  #config-banner {
+    background: rgba(255,71,87,0.08);
+    border: 1px solid var(--loss);
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 1.5rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--loss);
+    line-height: 1.7;
+  }
+  #config-banner strong { color: var(--accent); }
+
+  /* LEADERBOARD */
+  .lb-table { width: 100%; border-collapse: collapse; }
+  .lb-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .lb-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(30,30,46,0.5);
+    vertical-align: middle;
+  }
+  .lb-table tr:hover td { background: rgba(232,255,71,0.02); }
+  .lb-table tbody tr { cursor: pointer; }
+  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--muted); width: 3rem; }
+  .rank.top1 { color: var(--accent); }
+  .rank.top2 { color: #c0c0c0; }
+  .rank.top3 { color: #cd7f32; }
+  .player-name { font-size: 1rem; font-weight: 600; letter-spacing: 0.02em; }
+  .rating-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--accent); letter-spacing: 0.05em; }
+  .rd-val { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--muted); }
+  .record-badge { font-family: 'DM Mono', monospace; font-size: 0.7rem; display: inline-flex; gap: 0.5rem; }
+  .record-badge .w { color: var(--win); }
+  .record-badge .l { color: var(--loss); }
+
+  /* FORMS */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2rem;
+    max-width: 500px;
+    margin-bottom: 2rem;
+  }
+  .form-card h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.08em;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+  }
+  .field { margin-bottom: 1.2rem; }
+  label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  input, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  .btn {
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.85rem 2rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s;
+    display: inline-block;
+  }
+  .btn:hover { background: #fff; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-danger {
+    background: var(--loss);
+    color: #fff;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-danger:hover { opacity: 0.8; }
+
+  .msg {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin-top: 1rem;
+    border-left: 3px solid var(--accent);
+    background: rgba(232,255,71,0.05);
+    color: var(--accent);
+    display: none;
+  }
+  .msg.err { border-color: var(--loss); background: rgba(255,71,87,0.05); color: var(--loss); }
+
+  /* HISTORY */
+  .history-filters { display: flex; gap: 1rem; margin-bottom: 1.5rem; align-items: center; }
+  .history-filters select { width: auto; min-width: 200px; }
+  .match-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.5rem;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    transition: border-color 0.2s;
+  }
+  .match-row:hover { border-color: #2e2e4e; }
+  .match-player { display: flex; flex-direction: column; gap: 0.25rem; }
+  .match-player .name { font-weight: 600; font-size: 0.95rem; }
+  .match-player .delta { font-family: 'DM Mono', monospace; font-size: 0.75rem; }
+  .match-player .delta.pos { color: var(--win); }
+  .match-player .delta.neg { color: var(--loss); }
+  .match-player .rd-info { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); }
+  .match-result { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; text-align: center; color: var(--muted); letter-spacing: 0.1em; }
+  .match-result .win-side { color: var(--win); }
+  .match-result .loss-side { color: var(--loss); }
+  .match-meta { text-align: right; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); line-height: 1.6; }
+
+  .empty {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 3rem;
+    border: 1px dashed var(--border);
+  }
+
+  /* LOADING SPINNER */
+  .loading {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 3rem;
+    letter-spacing: 0.1em;
+  }
+  .loading::after {
+    content: '';
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin-left: 8px;
+    vertical-align: middle;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    header { padding: 1.5rem; flex-direction: column; gap: 0.5rem; }
+    header h1 { font-size: 2.5rem; }
+    nav { padding: 0 1rem; }
+    main { padding: 1.5rem; }
+    .match-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
+  }
+
+  /* PLAYER PROFILE MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,5,10,0.85);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    width: min(820px, 95vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: modalIn 0.2s ease;
+  }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .modal-header {
+    padding: 2rem 2rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .modal-header-left { display: flex; flex-direction: column; gap: 0.4rem; }
+  .modal-player-name { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 0.06em; color: var(--text); line-height: 1; }
+  .modal-player-stats { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .modal-stat { display: flex; flex-direction: column; gap: 0.2rem; }
+  .modal-stat-label { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .modal-stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--accent); line-height: 1; }
+  .modal-stat-value.neutral { color: var(--text); }
+  .modal-stat-value.green { color: var(--win); }
+  .modal-stat-value.red { color: var(--loss); }
+  .modal-close {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .modal-close:hover { border-color: var(--text); color: var(--text); }
+  .modal-body { padding: 2rem; }
+
+  .chart-section { margin-bottom: 2rem; }
+  .chart-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem; }
+  .chart-outer { border: 1px solid var(--border); background: var(--bg); overflow-x: auto; overflow-y: hidden; position: relative; height: 220px; cursor: crosshair; }
+  .chart-outer::-webkit-scrollbar { height: 4px; }
+  .chart-outer::-webkit-scrollbar-track { background: var(--bg); }
+  .chart-outer::-webkit-scrollbar-thumb { background: var(--border); }
+  .chart-wrap { position: relative; display: inline-block; min-width: 100%; }
+  .chart-tooltip {
+    position: absolute;
+    background: #13131e;
+    border: 1px solid #2e2e4e;
+    padding: 0.5rem 0.8rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text);
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+    line-height: 1.6;
+    white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  .profile-match {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid rgba(30,30,46,0.6);
+  }
+  .profile-match:last-child { border-bottom: none; }
+  .pm-badge { font-family: 'Bebas Neue', sans-serif; font-size: 0.95rem; width: 3.2rem; text-align: center; padding: 0.3rem 0; letter-spacing: 0.05em; }
+  .pm-badge.win  { color: var(--win);  background: rgba(71,255,184,0.08); }
+  .pm-badge.loss { color: var(--loss); background: rgba(255,71,87,0.08); }
+  .pm-info { display: flex; flex-direction: column; gap: 0.2rem; }
+  .pm-opponent { font-weight: 600; font-size: 0.9rem; }
+  .pm-date { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); }
+  .pm-delta { font-family: 'DM Mono', monospace; font-size: 0.85rem; text-align: right; white-space: nowrap; }
+  .pm-delta.pos { color: var(--win); }
+  .pm-delta.neg { color: var(--loss); }
+</style>
 </head>
 <body>
 
-    <div class="container">
-        <header>
-            <h1>🏓 TTTIW</h1>
-            <p>Table Tennis Texas InventionWorks</p>
-        </header>
+<header>
+  <h1>GLICKO-2</h1>
+  <span>Rating System · Firebase Sync</span>
+  <span id="sync-status" style="margin-left:auto;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;display:flex;align-items:center">
+    <span id="sync-dot"></span>
+    <span id="sync-label">CONNECTING…</span>
+  </span>
+  <span id="decay-status" style="font-size:0.65rem;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.1em"></span>
+</header>
 
-        <div class="panel">
-            <h2>Top Players</h2>
-            <table id="leaderboard">
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>Player</th>
-                        <th>ELO</th>
-                        <th>W - L</th>
-                    </tr>
-                </thead>
-                <tbody id="leaderboard-body"></tbody>
-            </table>
-        </div>
+<nav>
+  <button class="active" onclick="showPanel('leaderboard', this)">Leaderboard</button>
+  <button onclick="showPanel('players', this)">Players</button>
+  <button onclick="showPanel('match', this)">Submit Match</button>
+  <button onclick="showPanel('history', this)">Match History</button>
+</nav>
 
-        <div class="controls">
-            <div class="panel">
-                <h2>Log Match Result</h2>
-                <form id="log-match-form">
-                    <div class="form-group">
-                        <label for="winner-select">Winner 🏆</label>
-                        <select id="winner-select" required>
-                            <option value="">Select Winner...</option>
-                        </select>
-                    </div>
-                    <div class="vs">VS</div>
-                    <div class="form-group">
-                        <label for="loser-select">Loser 💀</label>
-                        <select id="loser-select" required>
-                            <option value="">Select Loser...</option>
-                        </select>
-                    </div>
-                    <button type="submit">Update Ratings</button>
-                </form>
-            </div>
-        </div>
+<main>
+  <!-- CONFIG BANNER (shown until user fills in Firebase config) -->
+  <div id="config-banner" style="display:none">
+    ⚠ <strong>SETUP REQUIRED</strong> — Open this file and replace the Firebase config values at the top of the &lt;script&gt; block with your own project credentials from the Firebase Console → Project Settings → Your apps.
+  </div>
 
-        <div class="panel" style="margin-bottom: 20px;">
-            <h2>Add Player</h2>
-            <form id="add-player-form">
-                <div class="form-group">
-                    <label for="player-name">Name</label>
-                    <input type="text" id="player-name" required placeholder="e.g. Ma Long">
-                </div>
-                <div class="form-group">
-                    <label for="initial-elo">Starting ELO (Default 1500)</label>
-                    <input type="number" id="initial-elo" value="1500" required>
-                </div>
-                <button type="submit">Register Player</button>
-            </form>
-        </div>
+  <!-- LEADERBOARD -->
+  <div id="panel-leaderboard" class="panel active">
+    <div id="lb-loading" class="loading">Loading leaderboard</div>
+    <table class="lb-table" id="lb-table" style="display:none">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Rating</th>
+          <th>RD</th>
+          <th>Record (W-L)</th>
+        </tr>
+      </thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+    <div id="lb-empty" class="empty" style="display:none">No players yet. Add some!</div>
+  </div>
 
-        <div class="panel">
-            <h2>👥 Manage Players</h2>
-            <div id="players-list" style="max-height: 250px; overflow-y: auto;">
-                <p style="color: #888; text-align: center;">No players yet</p>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>📋 Action Log</h2>
-            <div id="action-log-container" style="max-height: 500px; overflow-y: auto;">
-                <p style="color: #888; text-align: center;">No actions recorded yet</p>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>⚙️ Rules</h2>
-            <ul class="rules-list">
-                <li><strong>First to 11:</strong> Win by reaching 11 points with a 2-point lead</li>
-                <li><strong>2 Serves Each:</strong> Players alternate with 2 serves per turn</li>
-                <li><strong>Deuce Serving:</strong> At 10-10 (deuce), alternate serves on each point</li>
-                <li><strong>Serve Height:</strong> Ball must be struck 6 inches above the table surface</li>
-                <li><strong>No Reserves:</strong> Must have a confirmed player, no substitutions allowed</li>
-                <li><strong>ELO Rating:</strong> Based on opponent strength and match outcome</li>
-                <li><strong>K-Factor:</strong> 32 points per match</li>
-                <li><strong>Starting Rating:</strong> 1200 ELO by default</li>
-                <li><strong>Fairness:</strong> Beating stronger players gains more ELO</li>
-            </ul>
-        </div>
-
+  <!-- ADD PLAYERS -->
+  <div id="panel-players" class="panel">
+    <div class="form-card">
+      <h2>Add Player</h2>
+      <div class="field">
+        <label>Player Name</label>
+        <input type="text" id="player-name" placeholder="Enter name…">
+      </div>
+      <div class="field">
+        <label>Starting Rating (default 1500)</label>
+        <input type="number" id="player-rating" placeholder="1500">
+      </div>
+      <div class="field">
+        <label>Starting RD (default 350)</label>
+        <input type="number" id="player-rd" placeholder="350">
+      </div>
+      <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
+      <div class="msg" id="player-msg"></div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="glicko.js"></script>
+    <div class="form-card" style="border-color:#2e2e4e">
+      <h2>RD Decay Settings</h2>
+      <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.6">
+        RD increases each inactive period using the Glicko-2 formula φ* = √(φ² + σ²).<br>
+        Decay is computed lazily on each page load and match submission — no server cron needed.
+      </p>
+      <div class="field">
+        <label>Decay Period (per inactive period)</label>
+        <div style="display:flex;gap:0.5rem">
+          <input type="number" id="decay-amount" min="0.01" step="0.01" placeholder="7" style="flex:1">
+          <select id="decay-unit" style="width:120px">
+            <option value="days">Days</option>
+            <option value="hours">Hours</option>
+            <option value="minutes">Minutes</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" onclick="saveDecaySettings()">Save Settings</button>
+      <div class="msg" id="decay-msg"></div>
+    </div>
+
+    <div id="players-list"></div>
+  </div>
+
+  <!-- SUBMIT MATCH -->
+  <div id="panel-match" class="panel">
+    <div class="form-card">
+      <h2>Submit Match Result</h2>
+      <div class="field">
+        <label>Winner</label>
+        <select id="match-winner"></select>
+      </div>
+      <div class="field">
+        <label>Loser</label>
+        <select id="match-loser"></select>
+      </div>
+      <button class="btn" id="submit-match-btn" onclick="submitMatch()">Submit</button>
+      <div class="msg" id="match-msg"></div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="panel-history" class="panel">
+    <div class="history-filters">
+      <select id="history-filter" onchange="renderHistory()">
+        <option value="all">All Players</option>
+      </select>
+    </div>
+    <div id="history-list"><div class="loading">Loading matches</div></div>
+  </div>
+</main>
+
+<!-- PLAYER PROFILE MODAL -->
+<div class="modal-overlay" id="profile-overlay" onclick="closeProfile(event)">
+  <div class="modal" id="profile-modal">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-player-name" id="profile-name">—</div>
+        <div class="modal-player-stats" id="profile-stats"></div>
+      </div>
+      <button class="modal-close" onclick="document.getElementById('profile-overlay').classList.remove('open')">ESC ✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="chart-section">
+        <div class="chart-label">Rating History</div>
+        <div class="chart-outer" id="chart-outer">
+          <div class="chart-wrap" id="chart-wrap">
+            <canvas id="rating-chart"></canvas>
+            <div class="chart-tooltip" id="chart-tooltip"></div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-label" style="margin-bottom:1rem">Match History</div>
+      <div id="profile-matches"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     FIREBASE + APP LOGIC
+     ══════════════════════════════════════════════════════════════════════ -->
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────────
+// ❶  PASTE YOUR FIREBASE CONFIG HERE
+//    Firebase Console → Project Settings → Your apps → SDK setup and config
+// ─────────────────────────────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyCHRQOLzC0DcuZv4aCqsL4EM_IVthiZSIc",
+  authDomain:        "tttiw-6d44e.firebaseapp.com",
+  projectId:         "tttiw-6d44e",
+  storageBucket:     "tttiw-6d44e.firebasestorage.app",
+  messagingSenderId: "902138155809",
+  appId:             "1:902138155809:web:0860c66b77d07746952460"
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc,
+         addDoc, setDoc, updateDoc, deleteDoc,
+         onSnapshot, query, orderBy,
+         serverTimestamp, runTransaction,
+         getDoc }                                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── detect unconfigured ──
+const isConfigured = !Object.values(FIREBASE_CONFIG).some(v => v.startsWith("PASTE_"));
+if (!isConfigured) {
+  document.getElementById('config-banner').style.display = 'block';
+  setSyncState('error', 'NOT CONFIGURED');
+}
+
+let app, db;
+let players = [];   // live array, kept in sync by onSnapshot
+let matches  = [];  // live array, kept in sync by onSnapshot
+
+if (isConfigured) {
+  try {
+    app = initializeApp(FIREBASE_CONFIG);
+    db  = getFirestore(app);
+    initListeners();
+  } catch(e) {
+    setSyncState('error', 'INIT ERROR');
+    console.error(e);
+  }
+}
+
+// ─── GLICKO-2 CONSTANTS ──────────────────────────────────────────────────────
+const SIGMA_FIXED = 0.06;
+const RD_MAX      = 350;
+
+// ─── SYNC STATE ──────────────────────────────────────────────────────────────
+function setSyncState(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = state === 'ok' ? '' : state;
+  lbl.textContent = label || (state === 'ok' ? 'LIVE' : state.toUpperCase());
+}
+
+// ─── REAL-TIME LISTENERS ─────────────────────────────────────────────────────
+// onSnapshot fires immediately with current data, then again on every change.
+// This means the leaderboard updates live across all open browsers.
+function initListeners() {
+  setSyncState('syncing', 'CONNECTING…');
+
+  // Players listener
+  onSnapshot(
+    query(collection(db, 'players'), orderBy('rating', 'desc')),
+    (snap) => {
+      players = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+      applyDecayLocally();   // recalc decay on fresh data
+      renderLeaderboard();
+      renderPlayersList();
+      renderMatchSelects();
+      updateDecayStatus();
+      setSyncState('ok', 'LIVE');
+    },
+    (err) => { console.error('Players listener error:', err); setSyncState('error', 'SYNC ERROR'); }
+  );
+
+  // Matches listener
+  onSnapshot(
+    query(collection(db, 'matches'), orderBy('date', 'desc')),
+    (snap) => {
+      matches = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+      renderHistory();
+    },
+    (err) => { console.error('Matches listener error:', err); }
+  );
+
+  // Decay settings listener (single doc in a 'config' collection)
+  onSnapshot(doc(db, 'config', 'decay'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      document.getElementById('decay-amount').value = data.amount || '7';
+      document.getElementById('decay-unit').value   = data.unit   || 'days';
+    }
+  });
+}
+
+// ─── RD DECAY (lazy / client-side) ───────────────────────────────────────────
+// No cron needed. We compute how many periods have elapsed since lastDecayAt
+// and apply the Glicko-2 volatility formula as many times as needed.
+// The result is written back to Firestore so all clients see the same value.
+function getDecayPeriodMs() {
+  const amount = parseFloat(document.getElementById('decay-amount').value) || 7;
+  const unit   = document.getElementById('decay-unit').value || 'days';
+  if (unit === 'minutes') return amount * 60 * 1000;
+  if (unit === 'hours')   return amount * 3600 * 1000;
+  return amount * 86400 * 1000;
+}
+
+function computeDecay(player) {
+  const now      = Date.now();
+  const last     = player.lastDecayAt || now;
+  const msPerPeriod = getDecayPeriodMs();
+  const periods  = Math.floor((now - last) / msPerPeriod);
+  if (periods <= 0) return null;  // nothing to update
+
+  let phi = player.rd / 173.7178;
+  const phiMax = RD_MAX / 173.7178;
+  for (let i = 0; i < periods; i++) {
+    phi = Math.sqrt(phi * phi + SIGMA_FIXED * SIGMA_FIXED);
+    if (phi >= phiMax) { phi = phiMax; break; }
+  }
+  const newRD = Math.round(Math.min(phi * 173.7178, RD_MAX) * 10) / 10;
+  const newLastDecayAt = last + periods * msPerPeriod;
+  return { newRD, newLastDecayAt, periods };
+}
+
+// Apply decay locally for rendering (optimistic), then persist changed players
+function applyDecayLocally() {
+  if (!db) return;
+  const toUpdate = [];
+
+  players.forEach(p => {
+    const result = computeDecay(p);
+    if (!result) return;
+    // Mutate local copy
+    p.rd          = result.newRD;
+    p.lastDecayAt = result.newLastDecayAt;
+    toUpdate.push({ firestoreId: p.firestoreId, rd: result.newRD, lastDecayAt: result.newLastDecayAt });
+  });
+
+  // Persist silently in the background
+  toUpdate.forEach(({ firestoreId, rd, lastDecayAt }) => {
+    updateDoc(doc(db, 'players', firestoreId), { rd, lastDecayAt }).catch(console.error);
+  });
+}
+
+function updateDecayStatus() {
+  const statusEl = document.getElementById('decay-status');
+  if (!statusEl || players.length === 0) return;
+  const msPerPeriod = getDecayPeriodMs();
+  const now = Date.now();
+  const nextDecay = Math.min(...players.map(p => (p.lastDecayAt || now) + msPerPeriod - now));
+  const amount = document.getElementById('decay-amount').value || '7';
+  const unit   = document.getElementById('decay-unit').value || 'days';
+  const periodLabel = amount + unit.charAt(0).toUpperCase();
+
+  if (nextDecay > 0) {
+    const hrs  = Math.floor(nextDecay / 3600000);
+    const mins = Math.floor((nextDecay % 3600000) / 60000);
+    const secs = Math.floor((nextDecay % 60000) / 1000);
+    const nextLabel = hrs > 0 ? hrs + 'h ' + mins + 'm' : mins + 'm ' + secs + 's';
+    statusEl.textContent = 'DECAY · ' + periodLabel + ' · NEXT IN ' + nextLabel;
+  } else {
+    statusEl.textContent = 'DECAY · ' + periodLabel;
+  }
+}
+
+// ─── GLICKO-2 MATH ───────────────────────────────────────────────────────────
+function toGlicko2(r, rd) { return { mu: (r - 1500) / 173.7178, phi: rd / 173.7178 }; }
+function fromGlicko2(mu, phi) { return { r: mu * 173.7178 + 1500, rd: phi * 173.7178 }; }
+function g(phi) { return 1 / Math.sqrt(1 + 3 * phi * phi / (Math.PI * Math.PI)); }
+function E(mu, muJ, phiJ) { return 1 / (1 + Math.exp(-g(phiJ) * (mu - muJ))); }
+
+function glicko2Update(player, opponents) {
+  const { mu, phi } = toGlicko2(player.rating, player.rd);
+  if (opponents.length === 0) {
+    return { rating: player.rating, rd: Math.min(350, Math.sqrt(phi * phi + SIGMA_FIXED * SIGMA_FIXED) * 173.7178) };
+  }
+  let vInv = 0, delta_sum = 0;
+  for (const opp of opponents) {
+    const { mu: muJ, phi: phiJ } = toGlicko2(opp.rating, opp.rd);
+    const gJ = g(phiJ), eJ = E(mu, muJ, phiJ);
+    vInv += gJ * gJ * eJ * (1 - eJ);
+    delta_sum += gJ * (opp.s - eJ);
+  }
+  const v = 1 / vInv;
+  const phiStar = Math.sqrt(phi * phi + SIGMA_FIXED * SIGMA_FIXED);
+  const phiNew  = 1 / Math.sqrt(1 / (phiStar * phiStar) + 1 / v);
+  const muNew   = mu + phiNew * phiNew * delta_sum;
+  const res = fromGlicko2(muNew, phiNew);
+  return { rating: Math.round(res.r * 10) / 10, rd: Math.round(res.rd * 10) / 10 };
+}
+
+// ─── LEADERBOARD ─────────────────────────────────────────────────────────────
+function renderLeaderboard() {
+  const sorted = [...players].sort((a, b) => b.rating - a.rating);
+  const tbody  = document.getElementById('lb-body');
+  const empty  = document.getElementById('lb-empty');
+  const table  = document.getElementById('lb-table');
+  const loading = document.getElementById('lb-loading');
+
+  loading.style.display = 'none';
+
+  if (sorted.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  table.style.display = 'table';
+
+  tbody.innerHTML = sorted.map((p, i) => {
+    const rankClass = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
+    return `<tr onclick="window.openProfile('${p.firestoreId}')">
+      <td class="rank ${rankClass}">${i + 1}</td>
+      <td class="player-name">${esc(p.name)}</td>
+      <td><span class="rating-val">${Math.round(p.rating)}</span></td>
+      <td><span class="rd-val">±${Math.round(p.rd)}</span></td>
+      <td><span class="record-badge">
+        <span class="w">${p.wins}W</span>
+        <span class="l">${p.losses}L</span>
+      </span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── PLAYERS PANEL ───────────────────────────────────────────────────────────
+window.addPlayer = async function() {
+  if (!db) return;
+  const name   = document.getElementById('player-name').value.trim();
+  const rating = parseFloat(document.getElementById('player-rating').value) || 1500;
+  const rd     = parseFloat(document.getElementById('player-rd').value) || 350;
+  if (!name) { showMsg('player-msg', 'Name required.', true); return; }
+  if (players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showMsg('player-msg', 'Player already exists.', true); return;
+  }
+  const btn = document.getElementById('add-player-btn');
+  btn.disabled = true;
+  try {
+    await addDoc(collection(db, 'players'), {
+      name, rating, rd, wins: 0, losses: 0,
+      lastDecayAt: Date.now(),
+      createdAt: serverTimestamp()
+    });
+    document.getElementById('player-name').value   = '';
+    document.getElementById('player-rating').value = '';
+    document.getElementById('player-rd').value     = '';
+    showMsg('player-msg', `${name} added!`);
+  } catch(e) {
+    showMsg('player-msg', 'Error: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+window.removePlayer = async function(firestoreId) {
+  if (!db || !confirm('Remove this player? Their match history will remain.')) return;
+  try {
+    await deleteDoc(doc(db, 'players', firestoreId));
+  } catch(e) {
+    alert('Error removing player: ' + e.message);
+  }
+};
+
+function renderPlayersList() {
+  const el = document.getElementById('players-list');
+  if (players.length === 0) { el.innerHTML = '<div class="empty">No players yet.</div>'; return; }
+  const rows = players.map(p =>
+    `<tr>
+      <td class="player-name">${esc(p.name)}</td>
+      <td><span class="rating-val" style="font-size:1.2rem">${Math.round(p.rating)}</span></td>
+      <td><span class="rd-val">±${Math.round(p.rd)}</span></td>
+      <td><span class="record-badge"><span class="w">${p.wins}W</span> <span class="l">${p.losses}L</span></span></td>
+      <td><button class="btn-danger" onclick="window.removePlayer('${p.firestoreId}')">Remove</button></td>
+    </tr>`
+  ).join('');
+  el.innerHTML = `<table class="lb-table"><thead><tr><th>Name</th><th>Rating</th><th>RD</th><th>Record</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ─── DECAY SETTINGS ──────────────────────────────────────────────────────────
+window.saveDecaySettings = async function() {
+  const amount = parseFloat(document.getElementById('decay-amount').value);
+  const unit   = document.getElementById('decay-unit').value;
+  if (!amount || amount < 0.01) { showMsg('decay-msg', 'Enter a valid period.', true); return; }
+  try {
+    if (db) {
+      // Save to Firestore so all clients share the same setting
+      await setDoc(doc(db, 'config', 'decay'), { amount, unit });
+    }
+    applyDecayLocally();
+    updateDecayStatus();
+    showMsg('decay-msg', `Decay period set to ${amount} ${unit}.`);
+  } catch(e) {
+    showMsg('decay-msg', 'Error: ' + e.message, true);
+  }
+};
+
+// ─── SUBMIT MATCH ─────────────────────────────────────────────────────────────
+// Uses a Firestore transaction so concurrent submissions don't corrupt ratings.
+window.submitMatch = async function() {
+  if (!db) return;
+  const winnerId = document.getElementById('match-winner').value;
+  const loserId  = document.getElementById('match-loser').value;
+  if (winnerId === loserId) { showMsg('match-msg', 'Select two different players.', true); return; }
+
+  const btn = document.getElementById('submit-match-btn');
+  btn.disabled = true;
+  showMsg('match-msg', 'Submitting…');
+
+  try {
+    const winnerRef = doc(db, 'players', winnerId);
+    const loserRef  = doc(db, 'players', loserId);
+
+    await runTransaction(db, async (tx) => {
+      const [winnerSnap, loserSnap] = await Promise.all([tx.get(winnerRef), tx.get(loserRef)]);
+      if (!winnerSnap.exists() || !loserSnap.exists()) throw new Error('Player not found');
+
+      const winner = winnerSnap.data();
+      const loser  = loserSnap.data();
+
+      const updW = glicko2Update(winner, [{ rating: loser.rating, rd: loser.rd, s: 1 }]);
+      const updL = glicko2Update(loser,  [{ rating: winner.rating, rd: winner.rd, s: 0 }]);
+
+      const now = Date.now();
+      tx.update(winnerRef, { rating: updW.rating, rd: updW.rd, wins:   winner.wins   + 1, lastDecayAt: now });
+      tx.update(loserRef,  { rating: updL.rating, rd: updL.rd, losses: loser.losses  + 1, lastDecayAt: now });
+
+      // Write match record inside the same transaction so it's atomic
+      const matchRef = doc(collection(db, 'matches'));
+      tx.set(matchRef, {
+        winnerId, loserId,
+        winnerName: winner.name, loserName: loser.name,
+        p1id: winnerId, p2id: loserId,
+        p1name: winner.name, p2name: loser.name,
+        score: 1,
+        p1delta: Math.round((updW.rating - winner.rating) * 10) / 10,
+        p2delta: Math.round((updL.rating - loser.rating)  * 10) / 10,
+        p1newRD: updW.rd, p2newRD: updL.rd,
+        p1oldRating: winner.rating, p1newRating: updW.rating,
+        p2oldRating: loser.rating,  p2newRating: updL.rating,
+        date: serverTimestamp()
+      });
+    });
+
+    const w = players.find(p => p.firestoreId === winnerId);
+    const l = players.find(p => p.firestoreId === loserId);
+    showMsg('match-msg', `${w?.name || 'Winner'} wins!`);
+  } catch(e) {
+    showMsg('match-msg', 'Error: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+function renderMatchSelects() {
+  const opts = players.map(p => `<option value="${p.firestoreId}">${esc(p.name)} (${Math.round(p.rating)})</option>`).join('');
+  document.getElementById('match-winner').innerHTML = opts || '<option disabled>No players yet</option>';
+  document.getElementById('match-loser').innerHTML  = opts || '<option disabled>No players yet</option>';
+}
+
+// ─── MATCH HISTORY ────────────────────────────────────────────────────────────
+function renderHistoryFilter() {
+  const sel = document.getElementById('history-filter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="all">All Players</option>' +
+    players.map(p => `<option value="${p.firestoreId}">${esc(p.name)}</option>`).join('');
+  sel.value = players.find(p => p.firestoreId === cur) ? cur : 'all';
+}
+
+window.renderHistory = function() {
+  renderHistoryFilter();
+  const filter = document.getElementById('history-filter').value;
+  const el     = document.getElementById('history-list');
+  const playerIds = new Set(players.map(p => p.firestoreId));
+
+  let ms = matches.filter(m => playerIds.has(m.p1id) && playerIds.has(m.p2id));
+  if (filter !== 'all') ms = ms.filter(m => m.p1id === filter || m.p2id === filter);
+
+  if (ms.length === 0) { el.innerHTML = '<div class="empty">No matches yet.</div>'; return; }
+
+  el.innerHTML = ms.map(m => {
+    const ts = m.date?.toDate ? m.date.toDate() : new Date(m.date);
+    const dateStr = ts.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    const timeStr = ts.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    const d1str = (m.p1delta >= 0 ? '+' : '') + m.p1delta;
+    const d2str = (m.p2delta >= 0 ? '+' : '') + m.p2delta;
+    return `<div class="match-row">
+      <div class="match-player">
+        <span class="name">${esc(m.p1name)}</span>
+        <span class="delta ${m.p1delta >= 0 ? 'pos' : 'neg'}">${d1str} pts (${Math.round(m.p1oldRating)} → ${Math.round(m.p1newRating)})</span>
+        <span class="rd-info">RD: ±${Math.round(m.p1newRD)}</span>
+      </div>
+      <div class="match-result"><span class="win-side">WIN</span><br><span style="font-size:0.9rem;color:var(--muted)">vs</span><br><span class="loss-side">LOSS</span></div>
+      <div class="match-player" style="text-align:right">
+        <span class="name">${esc(m.p2name)}</span>
+        <span class="delta ${m.p2delta >= 0 ? 'pos' : 'neg'}">${d2str} pts (${Math.round(m.p2oldRating)} → ${Math.round(m.p2newRating)})</span>
+        <span class="rd-info">RD: ±${Math.round(m.p2newRD)}</span>
+      </div>
+      <div class="match-meta">${dateStr}<br>${timeStr}</div>
+    </div>`;
+  }).join('');
+};
+
+// ─── NAV ─────────────────────────────────────────────────────────────────────
+window.showPanel = function(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'players') {
+    renderPlayersList();
+  }
+  if (id === 'history') renderHistory();
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showMsg(id, text, isErr = false) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg' + (isErr ? ' err' : '');
+  el.style.display = 'block';
+  if (!isErr) setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+
+// ─── PLAYER PROFILE MODAL ────────────────────────────────────────────────────
+window.openProfile = function(firestoreId) {
+  const p = players.find(x => x.firestoreId === firestoreId);
+  if (!p) return;
+
+  const playerIds = new Set(players.map(x => x.firestoreId));
+  const playerMatches = [...matches]
+    .filter(m => playerIds.has(m.p1id) && playerIds.has(m.p2id))
+    .filter(m => m.p1id === firestoreId || m.p2id === firestoreId)
+    .sort((a, b) => {
+      const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+      const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+      return ta - tb;
+    });
+
+  document.getElementById('profile-name').textContent = p.name;
+
+  const winRate  = (p.wins + p.losses) > 0 ? Math.round(p.wins / (p.wins + p.losses) * 100) : 0;
+  const winClass = winRate >= 60 ? 'green' : winRate >= 40 ? 'neutral' : 'red';
+
+  document.getElementById('profile-stats').innerHTML = `
+    <div class="modal-stat"><span class="modal-stat-label">Rating</span><span class="modal-stat-value">${Math.round(p.rating)}</span></div>
+    <div class="modal-stat"><span class="modal-stat-label">RD</span><span class="modal-stat-value neutral">±${Math.round(p.rd)}</span></div>
+    <div class="modal-stat"><span class="modal-stat-label">Record</span><span class="modal-stat-value neutral">${p.wins}W – ${p.losses}L</span></div>
+    <div class="modal-stat"><span class="modal-stat-label">Win Rate</span><span class="modal-stat-value ${winClass}">${winRate}%</span></div>
+  `;
+
+  // Build chart points
+  const startRating = playerMatches.length > 0
+    ? (playerMatches[0].p1id === firestoreId ? playerMatches[0].p1oldRating : playerMatches[0].p2oldRating)
+    : p.rating;
+
+  const points = [{ rating: startRating, label: 'Start' }];
+  playerMatches.forEach(m => {
+    const isP1 = m.p1id === firestoreId;
+    const ts   = m.date?.toDate ? m.date.toDate() : new Date(m.date);
+    points.push({
+      rating: isP1 ? m.p1newRating : m.p2newRating,
+      won:    isP1 ? m.score === 1  : m.score === 0,
+      label:  isP1 ? m.p2name : m.p1name,
+      date:   ts.toISOString()
+    });
+  });
+
+  drawChart(points);
+
+  // Match list (newest first)
+  const matchesEl = document.getElementById('profile-matches');
+  if (playerMatches.length === 0) {
+    matchesEl.innerHTML = '<div class="empty">No matches yet.</div>';
+  } else {
+    matchesEl.innerHTML = [...playerMatches].reverse().map(m => {
+      const isP1     = m.p1id === firestoreId;
+      const won      = isP1 ? m.score === 1 : m.score === 0;
+      const opponent = isP1 ? m.p2name : m.p1name;
+      const delta    = isP1 ? m.p1delta : m.p2delta;
+      const oldR     = isP1 ? m.p1oldRating : m.p2oldRating;
+      const newR     = isP1 ? m.p1newRating : m.p2newRating;
+      const ts       = m.date?.toDate ? m.date.toDate() : new Date(m.date);
+      const dateStr  = ts.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      const timeStr  = ts.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+      const dStr     = (delta >= 0 ? '+' : '') + delta;
+      return `<div class="profile-match">
+        <span class="pm-badge ${won ? 'win' : 'loss'}">${won ? 'WIN' : 'LOSS'}</span>
+        <div class="pm-info">
+          <span class="pm-opponent">vs ${esc(opponent)}</span>
+          <span class="pm-date">${dateStr} · ${timeStr}</span>
+        </div>
+        <span class="pm-delta ${delta >= 0 ? 'pos' : 'neg'}">${dStr} pts<br><span style="font-size:0.7rem;color:var(--muted)">${Math.round(oldR)} → ${Math.round(newR)}</span></span>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('profile-overlay').classList.add('open');
+};
+
+function drawChart(points) {
+  const MIN_PX = 64;
+  const PAD = { top: 20, right: 30, bottom: 30, left: 52 };
+  const H = 220;
+
+  const outer     = document.getElementById('chart-outer');
+  const chartWrap = document.getElementById('chart-wrap');
+  const canvas    = document.getElementById('rating-chart');
+  const tooltip   = document.getElementById('chart-tooltip');
+
+  // Replace outer to remove stale listeners
+  const newOuter = outer.cloneNode(false);
+  while (outer.firstChild) newOuter.appendChild(outer.firstChild);
+  outer.parentNode.replaceChild(newOuter, outer);
+
+  const outerW = newOuter.clientWidth || 700;
+  const minW   = PAD.left + PAD.right + (points.length > 1 ? (points.length - 1) * MIN_PX : 200);
+  const W      = Math.max(outerW, minW);
+
+  chartWrap.style.width  = W + 'px';
+  chartWrap.style.height = H + 'px';
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top  - PAD.bottom;
+  const ratings = points.map(pt => pt.rating);
+  const minR = Math.min(...ratings), maxR = Math.max(...ratings);
+  const range = maxR - minR || 50;
+  const rPad  = range * 0.18;
+  const lo = minR - rPad, hi = maxR + rPad;
+
+  const xOf = i => PAD.left + (points.length > 1 ? (i / (points.length - 1)) * chartW : chartW / 2);
+  const yOf = r => PAD.top  + (1 - (r - lo) / (hi - lo)) * chartH;
+
+  function redraw(hlIdx) {
+    ctx.clearRect(0, 0, W, H);
+    // Grid
+    for (let g = 0; g <= 4; g++) {
+      const y = PAD.top + (g / 4) * chartH;
+      ctx.strokeStyle = 'rgba(30,30,46,0.9)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+      ctx.fillStyle = '#5a5a7a'; ctx.font = '10px DM Mono, monospace'; ctx.textAlign = 'right';
+      ctx.fillText(Math.round(hi - (g / 4) * (hi - lo)), PAD.left - 6, y + 3);
+    }
+    if (points.length < 2) {
+      ctx.fillStyle = '#5a5a7a'; ctx.font = '12px DM Mono, monospace'; ctx.textAlign = 'center';
+      ctx.fillText('Play more matches to see rating history', W / 2, H / 2); return;
+    }
+    // Lines + fills
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1], cur = points[i];
+      const color = cur.won ? '#47ffb8' : '#ff4757';
+      ctx.beginPath();
+      ctx.moveTo(xOf(i-1), yOf(prev.rating)); ctx.lineTo(xOf(i), yOf(cur.rating));
+      ctx.lineTo(xOf(i), H - PAD.bottom); ctx.lineTo(xOf(i-1), H - PAD.bottom); ctx.closePath();
+      ctx.fillStyle = cur.won ? 'rgba(71,255,184,0.07)' : 'rgba(255,71,87,0.07)'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(xOf(i-1), yOf(prev.rating)); ctx.lineTo(xOf(i), yOf(cur.rating));
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+    }
+    // Dots
+    for (let i = 0; i < points.length; i++) {
+      const pt    = points[i];
+      const color = i === 0 ? '#5a5a7a' : (pt.won ? '#47ffb8' : '#ff4757');
+      const isHl  = i === hlIdx;
+      if (isHl) {
+        ctx.beginPath(); ctx.arc(xOf(i), yOf(pt.rating), 9, 0, Math.PI*2);
+        ctx.fillStyle = i === 0 ? 'rgba(90,90,122,0.2)' : (pt.won ? 'rgba(71,255,184,0.2)' : 'rgba(255,71,87,0.2)');
+        ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(xOf(i), yOf(pt.rating), isHl ? 5 : 4, 0, Math.PI*2);
+      ctx.fillStyle = color; ctx.fill();
+      if (isHl) { ctx.beginPath(); ctx.arc(xOf(i), yOf(pt.rating), 2, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill(); }
+    }
+    if (hlIdx >= 0) {
+      ctx.beginPath(); ctx.moveTo(xOf(hlIdx), PAD.top); ctx.lineTo(xOf(hlIdx), H - PAD.bottom);
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  function showTooltip(idx) {
+    const pt = points[idx];
+    const colorHex = idx === 0 ? '#5a5a7a' : (pt.won ? '#47ffb8' : '#ff4757');
+    let html = `<span style="font-family:'Bebas Neue',sans-serif;font-size:1.15rem;color:${colorHex}">${Math.round(pt.rating)}</span>`;
+    if (idx === 0) {
+      html += `<br><span style="color:#5a5a7a">Starting rating</span>`;
+    } else {
+      const d    = new Date(pt.date);
+      const dStr = (pt.rating - points[idx-1].rating);
+      const dFmt = (dStr >= 0 ? '+' : '') + Math.round(dStr);
+      const dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+      html += `<br><span style="color:${colorHex}">${pt.won ? 'WIN' : 'LOSS'}</span> vs ${esc(pt.label)}`;
+      html += `<br><span style="color:${colorHex}">${dFmt} pts</span> · ${dateStr}`;
+    }
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    tooltip.style.left = '-9999px'; tooltip.style.top = '-9999px';
+    requestAnimationFrame(() => {
+      const dotX = xOf(idx), dotY = yOf(pt.rating);
+      const tipW = tooltip.offsetWidth, tipH = tooltip.offsetHeight;
+      let left = Math.max(PAD.left, Math.min(dotX - tipW / 2, W - PAD.right - tipW));
+      let top  = dotY - tipH - 10;
+      if (top < PAD.top) top = dotY + 14;
+      tooltip.style.left = left + 'px'; tooltip.style.top = top + 'px';
+    });
+  }
+
+  redraw(-1);
+  let curHl = -1;
+
+  function getNearestIdx(canvasX) {
+    let best = -1, bestD = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const d = Math.abs(xOf(i) - canvasX);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return bestD < 36 ? best : -1;
+  }
+
+  function onMove(e) {
+    const rect    = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const cx      = (clientX - rect.left) * (canvas.width / rect.width);
+    const idx     = getNearestIdx(cx);
+    if (idx !== curHl) {
+      curHl = idx; redraw(idx);
+      if (idx >= 0) showTooltip(idx); else tooltip.style.display = 'none';
+    }
+  }
+  function onLeave() { curHl = -1; redraw(-1); tooltip.style.display = 'none'; }
+
+  newOuter.addEventListener('mousemove', onMove);
+  newOuter.addEventListener('mouseleave', onLeave);
+  newOuter.addEventListener('touchmove', onMove, { passive: true });
+  newOuter.addEventListener('touchend', onLeave);
+}
+
+window.closeProfile = function(e) {
+  if (e.target === document.getElementById('profile-overlay'))
+    document.getElementById('profile-overlay').classList.remove('open');
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('profile-overlay').classList.remove('open');
+});
+</script>
 </body>
 </html>
