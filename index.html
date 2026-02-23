@@ -909,7 +909,8 @@ function renderLeaderboard() {
     lbQuoteEl = document.createElement('div');
     lbQuoteEl.id = 'lb-quote';
     lbQuoteEl.className = 'lb-quote';
-    table.parentNode.insertBefore(lbQuoteEl, table);
+    const panel = document.getElementById('panel-leaderboard');
+    panel.insertBefore(lbQuoteEl, panel.firstChild);
   }
   const topPlayer = visible[0];
   if (topPlayer && topPlayer.quote) {
@@ -974,6 +975,20 @@ window.removePlayer = async function(firestoreId) {
     await deleteDoc(doc(db, 'players', firestoreId));
   } catch(e) {
     alert('Error removing player: ' + e.message);
+  }
+};
+
+window.saveQuote2 = async function(firestoreId) {
+  if (!db) return;
+  const input = document.getElementById('qi2-' + firestoreId);
+  const quote = input ? input.value.trim() : '';
+  try {
+    await updateDoc(doc(db, 'players', firestoreId), { quote: quote || null });
+    const p = players.find(x => x.firestoreId === firestoreId);
+    if (p) p.quote = quote || null;
+    showMsg('qm2-' + firestoreId, quote ? 'Quote saved!' : 'Quote cleared.');
+  } catch(e) {
+    showMsg('qm2-' + firestoreId, 'Error: ' + e.message, true);
   }
 };
 
@@ -1131,10 +1146,46 @@ function renderPlayersList() {
     </div>`;
   }).join('');
 
-  const html = `<div class="player-cards-label">ALL PLAYERS (${players.length})</div><div class="player-cards-grid">${cards}</div>`;
-  el.innerHTML = html;
+  el.innerHTML = `<div class="player-cards-label">ALL PLAYERS (${players.length})</div><div class="player-cards-grid">${cards}</div>`;
+  // Render inline (desktop) column with different ID prefix to avoid duplicate IDs
   const inlineEl = document.getElementById('players-list-inline');
-  if (inlineEl) inlineEl.innerHTML = html;
+  if (inlineEl) {
+    const inlineCards = sorted.map(p => {
+      const winRate    = (p.wins + p.losses) > 0 ? Math.round(p.wins / (p.wins + p.losses) * 100) : 0;
+      const winClass   = winRate >= 60 ? 'var(--win)' : winRate >= 40 ? 'var(--text)' : 'var(--loss)';
+      const rdHidden   = p.rd > 100;
+      const rdColor    = rdHidden ? 'var(--loss)' : p.rd > 80 ? 'var(--accent)' : 'var(--win)';
+      const { longestStreak, longestAtOne } = computePlayerStats(p.firestoreId);
+      const streakColor = longestStreak >= 5 ? 'var(--win)' : longestStreak >= 3 ? 'var(--accent)' : 'var(--text)';
+      return `<div class="player-card" onclick="window.openProfile('${p.firestoreId}')">
+        <div class="player-card-top">
+          <span class="player-card-name">${esc(p.name)}</span>
+          ${rdHidden ? '<span class="player-card-tag">HIDDEN</span>' : ''}
+        </div>
+        <div class="player-card-stats">
+          <div class="player-card-stat"><span class="player-card-stat-label">Rating</span><span class="player-card-stat-val" style="color:var(--accent)">${Math.round(p.rating)}</span></div>
+          <div class="player-card-stat"><span class="player-card-stat-label">RD</span><span class="player-card-stat-val" style="color:${rdColor}">±${Math.round(p.rd)}</span></div>
+          <div class="player-card-stat"><span class="player-card-stat-label">Record</span><span class="player-card-stat-val" style="color:var(--text)">${p.wins}W–${p.losses}L</span></div>
+          <div class="player-card-stat"><span class="player-card-stat-label">Win %</span><span class="player-card-stat-val" style="color:${winClass}">${winRate}%</span></div>
+          <div class="player-card-stat"><span class="player-card-stat-label">Best Streak</span><span class="player-card-stat-val" style="color:${streakColor}">${longestStreak > 0 ? longestStreak + 'W' : '—'}</span></div>
+          <div class="player-card-stat"><span class="player-card-stat-label">Longest #1</span><span class="player-card-stat-val" style="color:var(--accent3);font-size:1rem;padding-top:0.2rem">${formatDuration(longestAtOne)}</span></div>
+        </div>
+        <div class="player-card-footer">
+          <span style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em">CLICK TO VIEW PROFILE</span>
+          <button class="btn-danger" onclick="event.stopPropagation();window.removePlayer('${p.firestoreId}')">Remove</button>
+        </div>
+        <div onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:0.4rem;padding-top:0.5rem;border-top:1px solid var(--border)">
+          <label style="margin-bottom:0">Player Quote</label>
+          <div style="display:flex;gap:0.5rem">
+            <input id="qi2-${p.firestoreId}" type="text" placeholder='"Something memorable…"' value="${esc(p.quote || '')}" style="font-size:0.8rem;padding:0.5rem 0.75rem">
+            <button class="btn" style="padding:0.5rem 0.8rem;font-size:0.65rem;white-space:nowrap" onclick="event.stopPropagation();window.saveQuote2('${p.firestoreId}')">Save</button>
+          </div>
+          <div class="msg" id="qm2-${p.firestoreId}" style="margin-top:0;padding:0.4rem 0.75rem;font-size:0.65rem"></div>
+        </div>
+      </div>`;
+    }).join('');
+    inlineEl.innerHTML = `<div class="player-cards-label">ALL PLAYERS (${sorted.length})</div><div class="player-cards-grid">${inlineCards}</div>`;
+  }
 }
 
 // ─── DECAY SETTINGS ──────────────────────────────────────────────────────────
@@ -1340,7 +1391,7 @@ window.openProfile = function(firestoreId) {
     const ts   = m.date?.toDate ? m.date.toDate() : new Date(m.date);
     points.push({
       rating: isP1 ? m.p1newRating : m.p2newRating,
-      won:    isP1 ? m.score === 1  : m.score === 0,
+      won:    m.winnerId === firestoreId,
       label:  isP1 ? m.p2name : m.p1name,
       date:   ts.toISOString()
     });
