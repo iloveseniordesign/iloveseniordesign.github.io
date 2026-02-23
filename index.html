@@ -245,7 +245,7 @@
   .match-player .delta.pos { color: var(--win); }
   .match-player .delta.neg { color: var(--loss); }
   .match-player .rd-info { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); }
-  .match-result { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; text-align: center; color: var(--muted); letter-spacing: 0.1em; }
+  .match-result { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; text-align: center; color: var(--muted); letter-spacing: 0.1em; display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
   .match-result .win-side { color: var(--win); }
   .match-result .loss-side { color: var(--loss); }
   .match-meta { text-align: right; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); line-height: 1.6; }
@@ -460,6 +460,58 @@
     border-top: 1px solid var(--border);
   }
 
+  /* PLAYERS TAB TWO-COLUMN LAYOUT */
+  .players-panel-layout {
+    display: grid;
+    grid-template-columns: 500px 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+  .players-forms-col { display: flex; flex-direction: column; }
+  .players-cards-col { min-width: 0; }
+  @media (max-width: 900px) {
+    .players-panel-layout { grid-template-columns: 1fr; }
+    .players-cards-col { display: none !important; }
+    #players-list { display: block !important; }
+  }
+  @media (min-width: 901px) {
+    #players-list { display: none !important; }
+  }
+
+  /* QUOTE */
+  .lb-quote {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 1.5rem;
+    padding: 0.9rem 1.2rem;
+    border-left: 3px solid var(--accent);
+    background: rgba(229,178,93,0.04);
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+  }
+  .lb-quote .quote-attr { color: var(--accent); font-style: normal; }
+  .modal-quote {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: 0.75rem;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+  .modal-quote .quote-attr { color: var(--accent); font-style: normal; }
+
+  /* MATCH SCORE */
+  .match-score-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.85rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    margin-top: 0.15rem;
+  }
+
   /* SCROLLBARS */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -527,47 +579,57 @@
 
   <!-- ADD PLAYERS -->
   <div id="panel-players" class="panel">
-    <div class="form-card">
-      <h2>Add Player</h2>
-      <div class="field">
-        <label>Player Name</label>
-        <input type="text" id="player-name" placeholder="Enter name…">
-      </div>
-      <div class="field">
-        <label>Starting Rating (default 1500)</label>
-        <input type="number" id="player-rating" placeholder="1500">
-      </div>
-      <div class="field">
-        <label>Starting RD (default 120)</label>
-        <input type="number" id="player-rd" placeholder="120">
-      </div>
-      <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
-      <div class="msg" id="player-msg"></div>
-    </div>
-
-    <div class="form-card" style="border-color:#2e2e4e">
-      <h2>RD Decay Settings</h2>
-      <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.6">
-        RD increases each inactive period using the Glicko-2 formula φ* = √(φ² + σ²).<br>
-        Decay is computed lazily on each page load and match submission — no server cron needed.<br>
-        Default RD: 120 · Max RD: 200 · Hidden from leaderboard if RD > 100.
-      </p>
-      <div class="field">
-        <label>Decay Period (per inactive period)</label>
-        <div style="display:flex;gap:0.5rem">
-          <input type="number" id="decay-amount" min="0.01" step="0.01" placeholder="7" style="flex:1">
-          <select id="decay-unit" style="width:120px">
-            <option value="days">Days</option>
-            <option value="hours">Hours</option>
-            <option value="minutes">Minutes</option>
-          </select>
+    <div class="players-panel-layout">
+      <div class="players-forms-col">
+        <div class="form-card">
+          <h2>Add Player</h2>
+          <div class="field">
+            <label>Player Name</label>
+            <input type="text" id="player-name" placeholder="Enter name…">
+          </div>
+          <div class="field">
+            <label>Starting Rating (default 1500)</label>
+            <input type="number" id="player-rating" placeholder="1500">
+          </div>
+          <div class="field">
+            <label>Starting RD (default 120)</label>
+            <input type="number" id="player-rd" placeholder="120">
+          </div>
+          <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
+          <div class="msg" id="player-msg"></div>
         </div>
-      </div>
-      <button class="btn" onclick="saveDecaySettings()">Save Settings</button>
-      <div class="msg" id="decay-msg"></div>
-    </div>
 
-    <div id="players-list"></div>
+        <div class="form-card" style="border-color:#2e2e4e">
+          <h2>RD Decay Settings</h2>
+          <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.6">
+            RD increases each inactive period using the Glicko-2 formula φ* = √(φ² + σ²).<br>
+            Decay is computed lazily on each page load and match submission — no server cron needed.<br>
+            Default RD: 120 · Max RD: 200 · Hidden from leaderboard if RD > 100.
+          </p>
+          <div class="field">
+            <label>Decay Period (per inactive period)</label>
+            <div style="display:flex;gap:0.5rem">
+              <input type="number" id="decay-amount" min="0.01" step="0.01" placeholder="7" style="flex:1">
+              <select id="decay-unit" style="width:120px">
+                <option value="days">Days</option>
+                <option value="hours">Hours</option>
+                <option value="minutes">Minutes</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn" onclick="saveDecaySettings()">Save Settings</button>
+          <div class="msg" id="decay-msg"></div>
+        </div>
+
+        <!-- mobile-only player list -->
+        <div id="players-list"></div>
+      </div>
+
+      <!-- desktop-only player cards column -->
+      <div class="players-cards-col">
+        <div id="players-list-inline"></div>
+      </div>
+    </div>
   </div>
 
   <!-- SUBMIT MATCH -->
@@ -581,6 +643,10 @@
       <div class="field">
         <label>Loser</label>
         <select id="match-loser"></select>
+      </div>
+      <div class="field">
+        <label>Score (optional, e.g. 11-7)</label>
+        <input type="text" id="match-score" placeholder="e.g. 11-7, 3-2, …">
       </div>
       <button class="btn" id="submit-match-btn" onclick="submitMatch()">Submit</button>
       <div class="msg" id="match-msg"></div>
@@ -605,6 +671,7 @@
       <div class="modal-header-left">
         <div class="modal-player-name" id="profile-name">—</div>
         <div class="modal-player-stats" id="profile-stats"></div>
+        <div class="modal-quote" id="profile-quote" style="display:none"></div>
       </div>
       <button class="modal-close" onclick="document.getElementById('profile-overlay').classList.remove('open')">ESC ✕</button>
     </div>
@@ -836,6 +903,22 @@ function renderLeaderboard() {
   const hiddenNote = document.getElementById('lb-hidden-note');
   if (hiddenNote) hiddenNote.style.display = 'none';
 
+  // Show #1 player's quote above the table
+  let lbQuoteEl = document.getElementById('lb-quote');
+  if (!lbQuoteEl) {
+    lbQuoteEl = document.createElement('div');
+    lbQuoteEl.id = 'lb-quote';
+    lbQuoteEl.className = 'lb-quote';
+    table.parentNode.insertBefore(lbQuoteEl, table);
+  }
+  const topPlayer = visible[0];
+  if (topPlayer && topPlayer.quote) {
+    lbQuoteEl.innerHTML = `"${esc(topPlayer.quote)}" <span class="quote-attr">— ${esc(topPlayer.name)}</span>`;
+    lbQuoteEl.style.display = 'block';
+  } else {
+    lbQuoteEl.style.display = 'none';
+  }
+
   tbody.innerHTML = visible.map((p, i) => {
     const rankClass = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
     return `<tr onclick="window.openProfile('${p.firestoreId}')">
@@ -891,6 +974,21 @@ window.removePlayer = async function(firestoreId) {
     await deleteDoc(doc(db, 'players', firestoreId));
   } catch(e) {
     alert('Error removing player: ' + e.message);
+  }
+};
+
+window.saveQuote = async function(firestoreId) {
+  if (!db) return;
+  const input = document.getElementById('quote-input-' + firestoreId);
+  const quote = input ? input.value.trim() : '';
+  try {
+    await updateDoc(doc(db, 'players', firestoreId), { quote: quote || null });
+    // Update local copy
+    const p = players.find(x => x.firestoreId === firestoreId);
+    if (p) p.quote = quote || null;
+    showMsg('quote-msg-' + firestoreId, quote ? 'Quote saved!' : 'Quote cleared.');
+  } catch(e) {
+    showMsg('quote-msg-' + firestoreId, 'Error: ' + e.message, true);
   }
 };
 
@@ -1022,10 +1120,21 @@ function renderPlayersList() {
         <span style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em">CLICK TO VIEW PROFILE</span>
         <button class="btn-danger" onclick="event.stopPropagation();window.removePlayer('${p.firestoreId}')">Remove</button>
       </div>
+      <div onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:0.4rem;padding-top:0.5rem;border-top:1px solid var(--border)">
+        <label style="margin-bottom:0">Player Quote</label>
+        <div style="display:flex;gap:0.5rem">
+          <input id="quote-input-${p.firestoreId}" type="text" placeholder='"Something memorable…"' value="${esc(p.quote || '')}" style="font-size:0.8rem;padding:0.5rem 0.75rem">
+          <button class="btn" style="padding:0.5rem 0.8rem;font-size:0.65rem;white-space:nowrap" onclick="event.stopPropagation();window.saveQuote('${p.firestoreId}')">Save</button>
+        </div>
+        <div class="msg" id="quote-msg-${p.firestoreId}" style="margin-top:0;padding:0.4rem 0.75rem;font-size:0.65rem"></div>
+      </div>
     </div>`;
   }).join('');
 
-  el.innerHTML = `<div class="player-cards-label">ALL PLAYERS (${players.length})</div><div class="player-cards-grid">${cards}</div>`;
+  const html = `<div class="player-cards-label">ALL PLAYERS (${players.length})</div><div class="player-cards-grid">${cards}</div>`;
+  el.innerHTML = html;
+  const inlineEl = document.getElementById('players-list-inline');
+  if (inlineEl) inlineEl.innerHTML = html;
 }
 
 // ─── DECAY SETTINGS ──────────────────────────────────────────────────────────
@@ -1076,6 +1185,7 @@ window.submitMatch = async function() {
       tx.update(winnerRef, { rating: updW.rating, rd: updW.rd, wins:   winner.wins   + 1, lastDecayAt: now });
       tx.update(loserRef,  { rating: updL.rating, rd: updL.rd, losses: loser.losses  + 1, lastDecayAt: now });
 
+      const matchScore = document.getElementById('match-score').value.trim();
       const matchRef = doc(collection(db, 'matches'));
       tx.set(matchRef, {
         winnerId, loserId,
@@ -1083,6 +1193,7 @@ window.submitMatch = async function() {
         p1id: winnerId, p2id: loserId,
         p1name: winner.name, p2name: loser.name,
         score: 1,
+        matchScore: matchScore || null,
         p1delta: Math.round((updW.rating - winner.rating) * 10) / 10,
         p2delta: Math.round((updL.rating - loser.rating)  * 10) / 10,
         p1newRD: updW.rd, p2newRD: updL.rd,
@@ -1094,6 +1205,7 @@ window.submitMatch = async function() {
 
     const w = players.find(p => p.firestoreId === winnerId);
     const l = players.find(p => p.firestoreId === loserId);
+    document.getElementById('match-score').value = '';
     showMsg('match-msg', `${w?.name || 'Winner'} wins!`);
   } catch(e) {
     showMsg('match-msg', 'Error: ' + e.message, true);
@@ -1134,19 +1246,20 @@ window.renderHistory = function() {
     const timeStr = ts.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
     const d1str   = (m.p1delta >= 0 ? '+' : '') + m.p1delta;
     const d2str   = (m.p2delta >= 0 ? '+' : '') + m.p2delta;
+    const scoreStr = m.matchScore ? `<span class="match-score-display">${esc(m.matchScore)}</span>` : '';
     return `<div class="match-row">
       <div class="match-player">
         <span class="name">${esc(m.p1name)}</span>
         <span class="delta ${m.p1delta >= 0 ? 'pos' : 'neg'}">${d1str} pts (${Math.round(m.p1oldRating)} → ${Math.round(m.p1newRating)})</span>
         <span class="rd-info">RD: ±${Math.round(m.p1newRD)}</span>
       </div>
-      <div class="match-result"><span class="win-side">WIN</span><br><span style="font-size:0.9rem;color:var(--muted)">vs</span><br><span class="loss-side">LOSS</span></div>
+      <div class="match-result"><span class="win-side">WIN</span><span style="font-size:0.9rem;color:var(--muted)">vs</span><span class="loss-side">LOSS</span></div>
       <div class="match-player" style="text-align:right">
         <span class="name">${esc(m.p2name)}</span>
         <span class="delta ${m.p2delta >= 0 ? 'pos' : 'neg'}">${d2str} pts (${Math.round(m.p2oldRating)} → ${Math.round(m.p2newRating)})</span>
         <span class="rd-info">RD: ±${Math.round(m.p2newRD)}</span>
       </div>
-      <div class="match-meta">${dateStr}<br>${timeStr}</div>
+      <div class="match-meta">${dateStr}<br>${timeStr}${m.matchScore ? '<br>' + esc(m.matchScore) : ''}</div>
     </div>`;
   }).join('');
 };
@@ -1194,14 +1307,27 @@ window.openProfile = function(firestoreId) {
 
   document.getElementById('profile-name').textContent = p.name;
 
+  const quoteEl = document.getElementById('profile-quote');
+  if (p.quote) {
+    quoteEl.innerHTML = `"${esc(p.quote)}" <span class="quote-attr">— ${esc(p.name)}</span>`;
+    quoteEl.style.display = 'block';
+  } else {
+    quoteEl.style.display = 'none';
+  }
+
   const winRate  = (p.wins + p.losses) > 0 ? Math.round(p.wins / (p.wins + p.losses) * 100) : 0;
   const winClass = winRate >= 60 ? 'green' : winRate >= 40 ? 'neutral' : 'red';
+  const { longestStreak, longestAtOne } = computePlayerStats(firestoreId);
+  const streakColor = longestStreak >= 5 ? 'green' : longestStreak >= 3 ? '' : 'neutral';
+  const atOneStr = formatDuration(longestAtOne);
 
   document.getElementById('profile-stats').innerHTML = `
     <div class="modal-stat"><span class="modal-stat-label">Rating</span><span class="modal-stat-value">${Math.round(p.rating)}</span></div>
     <div class="modal-stat"><span class="modal-stat-label">RD</span><span class="modal-stat-value neutral">±${Math.round(p.rd)}</span></div>
     <div class="modal-stat"><span class="modal-stat-label">Record</span><span class="modal-stat-value neutral">${p.wins}W – ${p.losses}L</span></div>
     <div class="modal-stat"><span class="modal-stat-label">Win Rate</span><span class="modal-stat-value ${winClass}">${winRate}%</span></div>
+    <div class="modal-stat"><span class="modal-stat-label">Best Streak</span><span class="modal-stat-value ${streakColor}">${longestStreak > 0 ? longestStreak + 'W' : '—'}</span></div>
+    <div class="modal-stat"><span class="modal-stat-label">Longest #1</span><span class="modal-stat-value" style="color:var(--accent3);font-size:1.2rem">${atOneStr}</span></div>
   `;
 
   const startRating = playerMatches.length > 0
@@ -1240,7 +1366,7 @@ window.openProfile = function(firestoreId) {
       return `<div class="profile-match">
         <span class="pm-badge ${won ? 'win' : 'loss'}">${won ? 'WIN' : 'LOSS'}</span>
         <div class="pm-info">
-          <span class="pm-opponent">vs ${esc(opponent)}</span>
+          <span class="pm-opponent">vs ${esc(opponent)}${m.matchScore ? ' <span style="font-family:\'DM Mono\',monospace;font-size:0.65rem;color:var(--muted);">' + esc(m.matchScore) + '</span>' : ''}</span>
           <span class="pm-date">${dateStr} · ${timeStr}</span>
         </div>
         <span class="pm-delta ${delta >= 0 ? 'pos' : 'neg'}">${dStr} pts<br><span style="font-size:0.7rem;color:var(--muted)">${Math.round(oldR)} → ${Math.round(newR)}</span></span>
