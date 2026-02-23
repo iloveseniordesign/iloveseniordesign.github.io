@@ -39,19 +39,7 @@
     z-index: 0;
   }
 
-  /* ── SYNC INDICATOR ── */
-  #sync-dot {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--win);
-    margin-right: 5px;
-    vertical-align: middle;
-    transition: background 0.3s;
-  }
-  #sync-dot.syncing { background: var(--accent); animation: pulse 0.8s infinite alternate; }
-  #sync-dot.error   { background: var(--loss); animation: none; }
-  @keyframes pulse { from { opacity: 1; } to { opacity: 0.3; } }
+
 
   header {
     padding: 2rem 3rem 1.5rem;
@@ -397,18 +385,89 @@
   .pm-delta { font-family: 'DM Mono', monospace; font-size: 0.85rem; text-align: right; white-space: nowrap; }
   .pm-delta.pos { color: var(--win); }
   .pm-delta.neg { color: var(--loss); }
+
+  /* PLAYER CARDS (Players tab) */
+  .player-cards-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+  .player-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+  .player-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .player-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .player-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .player-card-name {
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .player-card-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--loss);
+    border: 1px solid var(--loss);
+    padding: 0.15rem 0.4rem;
+    flex-shrink: 0;
+  }
+  .player-card-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 1rem;
+  }
+  .player-card-stat { display: flex; flex-direction: column; gap: 0.15rem; }
+  .player-card-stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .player-card-stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    line-height: 1;
+  }
+  .player-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
 </style>
 </head>
 <body>
 
 <header>
-  <h1>GLICKO-2</h1>
-  <span>Rating System · Firebase Sync</span>
-  <span id="sync-status" style="margin-left:auto;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;display:flex;align-items:center">
-    <span id="sync-dot"></span>
-    <span id="sync-label">CONNECTING…</span>
-  </span>
-  <span id="decay-status" style="font-size:0.65rem;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.1em"></span>
+  <h1>TTTIW</h1>
+  <span>Texas Invention<span style="color:var(--accent)">Works</span> · Rating System</span>
+  <span id="decay-status" style="margin-left:auto;font-size:0.65rem;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.1em"></span>
 </header>
 
 <nav>
@@ -455,8 +514,8 @@
         <input type="number" id="player-rating" placeholder="1500">
       </div>
       <div class="field">
-        <label>Starting RD (default 350)</label>
-        <input type="number" id="player-rd" placeholder="350">
+        <label>Starting RD (default 120)</label>
+        <input type="number" id="player-rd" placeholder="120">
       </div>
       <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
       <div class="msg" id="player-msg"></div>
@@ -466,7 +525,8 @@
       <h2>RD Decay Settings</h2>
       <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.6">
         RD increases each inactive period using the Glicko-2 formula φ* = √(φ² + σ²).<br>
-        Decay is computed lazily on each page load and match submission — no server cron needed.
+        Decay is computed lazily on each page load and match submission — no server cron needed.<br>
+        Default RD: 120 · Max RD: 200 · Hidden from leaderboard if RD > 100.
       </p>
       <div class="field">
         <label>Decay Period (per inactive period)</label>
@@ -569,7 +629,6 @@ import { getFirestore, collection, doc,
 const isConfigured = !Object.values(FIREBASE_CONFIG).some(v => v.startsWith("PASTE_"));
 if (!isConfigured) {
   document.getElementById('config-banner').style.display = 'block';
-  setSyncState('error', 'NOT CONFIGURED');
 }
 
 let app, db;
@@ -582,28 +641,20 @@ if (isConfigured) {
     db  = getFirestore(app);
     initListeners();
   } catch(e) {
-    setSyncState('error', 'INIT ERROR');
     console.error(e);
   }
 }
 
 // ─── GLICKO-2 CONSTANTS ──────────────────────────────────────────────────────
 const SIGMA_FIXED = 0.06;
-const RD_MAX      = 350;
+const RD_MAX      = 200;
 
-// ─── SYNC STATE ──────────────────────────────────────────────────────────────
-function setSyncState(state, label) {
-  const dot = document.getElementById('sync-dot');
-  const lbl = document.getElementById('sync-label');
-  dot.className = state === 'ok' ? '' : state;
-  lbl.textContent = label || (state === 'ok' ? 'LIVE' : state.toUpperCase());
-}
+
 
 // ─── REAL-TIME LISTENERS ─────────────────────────────────────────────────────
 // onSnapshot fires immediately with current data, then again on every change.
 // This means the leaderboard updates live across all open browsers.
 function initListeners() {
-  setSyncState('syncing', 'CONNECTING…');
 
   // Players listener
   onSnapshot(
@@ -615,9 +666,8 @@ function initListeners() {
       renderPlayersList();
       renderMatchSelects();
       updateDecayStatus();
-      setSyncState('ok', 'LIVE');
-    },
-    (err) => { console.error('Players listener error:', err); setSyncState('error', 'SYNC ERROR'); }
+      },
+    (err) => { console.error('Players listener error:', err); }
   );
 
   // Matches listener
@@ -733,7 +783,7 @@ function E(mu, muJ, phiJ) { return 1 / (1 + Math.exp(-g(phiJ) * (mu - muJ))); }
 function glicko2Update(player, opponents) {
   const { mu, phi } = toGlicko2(player.rating, player.rd);
   if (opponents.length === 0) {
-    return { rating: player.rating, rd: Math.min(350, Math.sqrt(phi * phi + SIGMA_FIXED * SIGMA_FIXED) * 173.7178) };
+    return { rating: player.rating, rd: Math.min(RD_MAX, Math.sqrt(phi * phi + SIGMA_FIXED * SIGMA_FIXED) * 173.7178) };
   }
   let vInv = 0, delta_sum = 0;
   for (const opp of opponents) {
@@ -768,7 +818,26 @@ function renderLeaderboard() {
   empty.style.display = 'none';
   table.style.display = 'table';
 
-  tbody.innerHTML = sorted.map((p, i) => {
+  const visible = sorted.filter(p => p.rd <= 100);
+  if (visible.length === 0 && sorted.length > 0) {
+    table.style.display = 'none';
+    empty.style.display = 'none';
+    document.getElementById('lb-loading').style.display = 'none';
+    let hiddenNote = document.getElementById('lb-hidden-note');
+    if (!hiddenNote) {
+      hiddenNote = document.createElement('div');
+      hiddenNote.id = 'lb-hidden-note';
+      hiddenNote.className = 'empty';
+      document.getElementById('panel-leaderboard').appendChild(hiddenNote);
+    }
+    hiddenNote.style.display = 'block';
+    hiddenNote.textContent = sorted.length + ' player(s) exist but all have RD > 100 (not enough matches to rank). Play more games!';
+    return;
+  }
+  const hiddenNote = document.getElementById('lb-hidden-note');
+  if (hiddenNote) hiddenNote.style.display = 'none';
+
+  tbody.innerHTML = visible.map((p, i) => {
     const rankClass = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
     return `<tr onclick="window.openProfile('${p.firestoreId}')">
       <td class="rank ${rankClass}">${i + 1}</td>
@@ -781,6 +850,10 @@ function renderLeaderboard() {
       </span></td>
     </tr>`;
   }).join('');
+  if (sorted.length > visible.length) {
+    const hiddenCount = sorted.length - visible.length;
+    tbody.innerHTML += `<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);padding:0.75rem 1rem;text-align:center">${hiddenCount} player(s) hidden (RD > 100 — not enough recent matches)</td></tr>`;
+  }
 }
 
 // ─── PLAYERS PANEL ───────────────────────────────────────────────────────────
@@ -788,7 +861,7 @@ window.addPlayer = async function() {
   if (!db) return;
   const name   = document.getElementById('player-name').value.trim();
   const rating = parseFloat(document.getElementById('player-rating').value) || 1500;
-  const rd     = parseFloat(document.getElementById('player-rd').value) || 350;
+  const rd     = parseFloat(document.getElementById('player-rd').value) || 120;
   if (!name) { showMsg('player-msg', 'Name required.', true); return; }
   if (players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
     showMsg('player-msg', 'Player already exists.', true); return;
@@ -821,19 +894,150 @@ window.removePlayer = async function(firestoreId) {
   }
 };
 
+
+// ─── PLAYER STAT HELPERS ─────────────────────────────────────────────────────
+
+function computePlayerStats(firestoreId) {
+  const playerIds = new Set(players.map(x => x.firestoreId));
+  const pm = [...matches]
+    .filter(m => playerIds.has(m.p1id) && playerIds.has(m.p2id))
+    .filter(m => m.p1id === firestoreId || m.p2id === firestoreId)
+    .sort((a, b) => {
+      const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+      const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+      return ta - tb;
+    });
+
+  // Longest win streak
+  let longestStreak = 0, curStreak = 0;
+  pm.forEach(m => {
+    const isP1 = m.p1id === firestoreId;
+    const won  = isP1 ? m.score === 1 : m.score === 0;
+    if (won) { curStreak++; longestStreak = Math.max(longestStreak, curStreak); }
+    else curStreak = 0;
+  });
+
+  // Longest time at #1: replay rating history across all players after each match
+  // We only do this if there are enough players/matches to make it meaningful
+  let longestAtOne = 0; // in milliseconds
+  const allSortedMatches = [...matches]
+    .filter(m => playerIds.has(m.p1id) && playerIds.has(m.p2id))
+    .sort((a, b) => {
+      const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+      const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+      return ta - tb;
+    });
+
+  if (allSortedMatches.length > 0 && players.length >= 2) {
+    // Build a snapshot of ratings at each point in time
+    const ratingSnapshots = {}; // firestoreId -> rating after each match
+    players.forEach(p => { ratingSnapshots[p.firestoreId] = 1500; }); // starting ratings
+
+    // Seed starting ratings from first match each player appears in
+    const seenPlayers = new Set();
+    allSortedMatches.forEach(m => {
+      if (!seenPlayers.has(m.p1id)) { ratingSnapshots[m.p1id] = m.p1oldRating; seenPlayers.add(m.p1id); }
+      if (!seenPlayers.has(m.p2id)) { ratingSnapshots[m.p2id] = m.p2oldRating; seenPlayers.add(m.p2id); }
+    });
+
+    let atOneStart = null;
+    const getTopPlayer = () => {
+      let topId = null, topR = -Infinity;
+      Object.entries(ratingSnapshots).forEach(([id, r]) => { if (r > topR) { topR = r; topId = id; } });
+      return topId;
+    };
+
+    allSortedMatches.forEach((m, i) => {
+      const prevTop = getTopPlayer();
+      ratingSnapshots[m.p1id] = m.p1newRating;
+      ratingSnapshots[m.p2id] = m.p2newRating;
+      const newTop = getTopPlayer();
+
+      const ts = m.date?.toDate ? m.date.toDate() : new Date(m.date);
+
+      // Track reigns for our player
+      if (prevTop === firestoreId && newTop !== firestoreId) {
+        // Lost #1 spot
+        if (atOneStart !== null) {
+          longestAtOne = Math.max(longestAtOne, ts.getTime() - atOneStart);
+          atOneStart = null;
+        }
+      } else if (prevTop !== firestoreId && newTop === firestoreId) {
+        // Gained #1 spot
+        atOneStart = ts.getTime();
+      }
+    });
+
+    // If still at #1, count up to now
+    if (getTopPlayer() === firestoreId && atOneStart !== null) {
+      longestAtOne = Math.max(longestAtOne, Date.now() - atOneStart);
+    }
+  }
+
+  return { longestStreak, longestAtOne };
+}
+
+function formatDuration(ms) {
+  if (ms <= 0) return '—';
+  const days  = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  if (days > 0) return days + 'd ' + hours + 'h';
+  const mins = Math.floor((ms % 3600000) / 60000);
+  if (hours > 0) return hours + 'h ' + mins + 'm';
+  return mins + 'm';
+}
+
 function renderPlayersList() {
   const el = document.getElementById('players-list');
   if (players.length === 0) { el.innerHTML = '<div class="empty">No players yet.</div>'; return; }
-  const rows = players.map(p =>
-    `<tr>
-      <td class="player-name">${esc(p.name)}</td>
-      <td><span class="rating-val" style="font-size:1.2rem">${Math.round(p.rating)}</span></td>
-      <td><span class="rd-val">±${Math.round(p.rd)}</span></td>
-      <td><span class="record-badge"><span class="w">${p.wins}W</span> <span class="l">${p.losses}L</span></span></td>
-      <td><button class="btn-danger" onclick="window.removePlayer('${p.firestoreId}')">Remove</button></td>
-    </tr>`
-  ).join('');
-  el.innerHTML = `<table class="lb-table"><thead><tr><th>Name</th><th>Rating</th><th>RD</th><th>Record</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+
+  const sorted = [...players].sort((a, b) => b.rating - a.rating);
+  const cards = sorted.map(p => {
+    const winRate = (p.wins + p.losses) > 0 ? Math.round(p.wins / (p.wins + p.losses) * 100) : 0;
+    const winClass = winRate >= 60 ? 'var(--win)' : winRate >= 40 ? 'var(--text)' : 'var(--loss)';
+    const rdHidden = p.rd > 100;
+    const rdColor = rdHidden ? 'var(--loss)' : p.rd > 80 ? 'var(--accent)' : 'var(--win)';
+    const { longestStreak, longestAtOne } = computePlayerStats(p.firestoreId);
+    const streakColor = longestStreak >= 5 ? 'var(--win)' : longestStreak >= 3 ? 'var(--accent)' : 'var(--text)';
+    return `<div class="player-card" onclick="window.openProfile('${p.firestoreId}')">
+      <div class="player-card-top">
+        <span class="player-card-name">${esc(p.name)}</span>
+        ${rdHidden ? '<span class="player-card-tag">HIDDEN</span>' : ''}
+      </div>
+      <div class="player-card-stats">
+        <div class="player-card-stat">
+          <span class="player-card-stat-label">Rating</span>
+          <span class="player-card-stat-val" style="color:var(--accent)">${Math.round(p.rating)}</span>
+        </div>
+        <div class="player-card-stat">
+          <span class="player-card-stat-label">RD</span>
+          <span class="player-card-stat-val" style="color:${rdColor}">±${Math.round(p.rd)}</span>
+        </div>
+        <div class="player-card-stat">
+          <span class="player-card-stat-label">Record</span>
+          <span class="player-card-stat-val" style="color:var(--text)">${p.wins}W–${p.losses}L</span>
+        </div>
+        <div class="player-card-stat">
+          <span class="player-card-stat-label">Win %</span>
+          <span class="player-card-stat-val" style="color:${winClass}">${winRate}%</span>
+        </div>
+        <div class="player-card-stat">
+          <span class="player-card-stat-label">Best Streak</span>
+          <span class="player-card-stat-val" style="color:${streakColor}">${longestStreak > 0 ? longestStreak + 'W' : '—'}</span>
+        </div>
+        <div class="player-card-stat">
+          <span class="player-card-stat-label">Longest #1</span>
+          <span class="player-card-stat-val" style="color:var(--accent3);font-size:1rem;padding-top:0.2rem">${formatDuration(longestAtOne)}</span>
+        </div>
+      </div>
+      <div class="player-card-footer">
+        <span style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em">CLICK TO VIEW PROFILE</span>
+        <button class="btn-danger" onclick="event.stopPropagation();window.removePlayer('${p.firestoreId}')">Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="player-cards-label">ALL PLAYERS (${players.length})</div><div class="player-cards-grid">${cards}</div>`;
 }
 
 // ─── DECAY SETTINGS ──────────────────────────────────────────────────────────
