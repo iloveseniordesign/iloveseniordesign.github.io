@@ -857,12 +857,57 @@ function pStats(fid){
   let la=0;
   const all=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)).sort((a,b)=>toTs(a)-toTs(b));
   if(all.length&&players.length>=2){
-    const rs={};players.forEach(p=>{rs[p.firestoreId]=1500;});
-    const seen=new Set();all.forEach(m=>{if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;seen.add(m.p1id);}if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;seen.add(m.p2id);}});
-    let a1=null;const top=()=>Object.entries(rs).reduce((b,[id,r])=>r>b[1]?[id,r]:b,[null,-Infinity])[0];
-    all.forEach(m=>{const pt=top();rs[m.p1id]=m.p1newRating;rs[m.p2id]=m.p2newRating;const nt=top(),ts=toTs(m);
-      if(pt===fid&&nt!==fid){if(a1!==null){la=Math.max(la,ts-a1);a1=null;}}else if(pt!==fid&&nt===fid)a1=ts;});
-    if(top()===fid&&a1!==null)la=Math.max(la,Date.now()-a1);
+    // Track both rating and RD per player so we can check leaderboard eligibility (RD<=100)
+    const rs={},rds={};
+    players.forEach(p=>{rs[p.firestoreId]=1500;rds[p.firestoreId]=350;}); // 350=unranked default before first match
+    // Seed from first match each player appears in
+    const seen=new Set();
+    all.forEach(m=>{
+      if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;rds[m.p1id]=m.p1newRD??120;seen.add(m.p1id);}
+      if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;rds[m.p2id]=m.p2newRD??120;seen.add(m.p2id);}
+    });
+    const periodMs=decayMs();
+    // Returns the #1 ranked player among those with RD<=100, or null if nobody qualifies
+    const top=()=>{
+      let best=null,bestR=-Infinity;
+      for(const[id,r] of Object.entries(rs)){if(rds[id]<=100&&r>bestR){bestR=r;best=id;}}
+      return best;
+    };
+    let a1=null,lastTs=null;
+    all.forEach(m=>{
+      const ts=toTs(m);
+      // Before applying this match's results, check if RD decay since last match
+      // pushed anyone off the leaderboard — if that knocked fid off #1, end streak
+      if(lastTs!==null&&periodMs>0){
+        const periods=Math.floor((ts-lastTs)/periodMs);
+        if(periods>0){
+          // Check if fid was #1 before decay
+          const wasFidTop=top()===fid;
+          // Apply decay to all players
+          for(const id of Object.keys(rds)){
+            let phi=rds[id]/173.7178;
+            const phiMax=RD_MAX/173.7178;
+            for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+            rds[id]=Math.min(phi*173.7178,RD_MAX);
+          }
+          // If fid was #1 and decay knocked it off leaderboard, end streak at decay point
+          if(wasFidTop&&top()!==fid){
+            if(a1!==null){la=Math.max(la,lastTs+periods*periodMs-a1);a1=null;}
+          }
+        }
+      }
+      const pt=top();
+      rs[m.p1id]=m.p1newRating;rs[m.p2id]=m.p2newRating;
+      rds[m.p1id]=m.p1newRD??rds[m.p1id];rds[m.p2id]=m.p2newRD??rds[m.p2id];
+      const nt=top();
+      if(pt===fid&&nt!==fid){if(a1!==null){la=Math.max(la,ts-a1);a1=null;}}
+      else if(pt!==fid&&nt===fid)a1=ts;
+      lastTs=ts;
+    });
+    // If still #1 now (with current live RD after live decay)
+    const liveRdOk=rds[fid]<=100;
+    if(top()===fid&&liveRdOk&&a1!==null)la=Math.max(la,Date.now()-a1);
+    else if(a1!==null){la=Math.max(la,0);} // streak ended (RD decay or displaced), don't extend
   }
   return{ls,la};
 }
@@ -950,22 +995,49 @@ window.triggerSeasonReset=async function(){
       pm.forEach(m=>{const w=m.winnerId===pid;w?(cs++,ls=Math.max(ls,cs)):cs=0;});
       let la=0;
       if(allMatches.length&&players.length>=2){
-        const rs={};players.forEach(p=>{rs[p.firestoreId]=1500;});
+        // Track both rating and RD — only RD<=100 players count for #1
+        const rs={},rds={};
+        players.forEach(p=>{rs[p.firestoreId]=1500;rds[p.firestoreId]=350;});
         const seen=new Set();
         allMatches.forEach(m=>{
-          if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;seen.add(m.p1id);}
-          if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;seen.add(m.p2id);}
+          if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;rds[m.p1id]=m.p1newRD??120;seen.add(m.p1id);}
+          if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;rds[m.p2id]=m.p2newRD??120;seen.add(m.p2id);}
         });
-        let a1=null;
-        const top=()=>Object.entries(rs).reduce((b,[id,r])=>r>b[1]?[id,r]:b,[null,-Infinity])[0];
+        const periodMs=decayMs();
+        const top=()=>{
+          let best=null,bestR=-Infinity;
+          for(const[id,r] of Object.entries(rs)){if(rds[id]<=100&&r>bestR){bestR=r;best=id;}}
+          return best;
+        };
+        let a1=null,lastTs=null;
         allMatches.forEach(m=>{
+          const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+          // Apply RD decay between matches — if it knocks pid off leaderboard, end streak
+          if(lastTs!==null&&periodMs>0){
+            const periods=Math.floor((ts-lastTs)/periodMs);
+            if(periods>0){
+              const wasPidTop=top()===pid;
+              for(const id of Object.keys(rds)){
+                let phi=rds[id]/173.7178;
+                const phiMax=RD_MAX/173.7178;
+                for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+                rds[id]=Math.min(phi*173.7178,RD_MAX);
+              }
+              if(wasPidTop&&top()!==pid){
+                if(a1!==null){la=Math.max(la,lastTs+periods*periodMs-a1);a1=null;}
+              }
+            }
+          }
           const pt=top();
           rs[m.p1id]=m.p1newRating;rs[m.p2id]=m.p2newRating;
-          const nt=top(),ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+          rds[m.p1id]=m.p1newRD??rds[m.p1id];rds[m.p2id]=m.p2newRD??rds[m.p2id];
+          const nt=top();
           if(pt===pid&&nt!==pid){if(a1!==null){la=Math.max(la,ts-a1);a1=null;}}
           else if(pt!==pid&&nt===pid)a1=ts;
+          lastTs=ts;
         });
-        if(top()===pid&&a1!==null)la=Math.max(la,endedAt?new Date(endedAt).getTime()-a1:la);
+        const endTs=endedAt?new Date(endedAt).getTime():Date.now();
+        if(top()===pid&&rds[pid]<=100&&a1!==null)la=Math.max(la,endTs-a1);
       }
       const sorted=pm.slice().sort((a,b)=>(a.date?.toDate?a.date.toDate():new Date(a.date))-(b.date?.toDate?b.date.toDate():new Date(b.date)));
       const chartPts=[];
