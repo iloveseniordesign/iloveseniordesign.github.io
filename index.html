@@ -481,17 +481,16 @@
   /* QUOTE */
   .lb-quote {
     font-family: 'DM Mono', monospace;
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--muted);
     font-style: italic;
     margin-bottom: 1.5rem;
-    padding: 0.9rem 1.2rem;
-    border-left: 3px solid var(--accent);
-    background: rgba(229,178,93,0.04);
-    letter-spacing: 0.02em;
+    text-align: center;
+    letter-spacing: 0.04em;
     line-height: 1.6;
+    opacity: 0.8;
   }
-  .lb-quote .quote-attr { color: var(--accent); font-style: normal; }
+  .lb-quote .quote-attr { color: var(--muted); font-style: normal; }
   .modal-quote {
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
@@ -510,6 +509,41 @@
     color: var(--muted);
     letter-spacing: 0.08em;
     margin-top: 0.15rem;
+  }
+
+  /* RULES */
+  .rules-list { display: flex; flex-direction: column; gap: 0; }
+  .rule-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .rule-item:last-child { border-bottom: none; }
+  .rule-icon {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    min-width: 2.5rem;
+    text-align: center;
+    padding-top: 0.1rem;
+    flex-shrink: 0;
+  }
+  .rule-title {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+  }
+  .rule-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.6;
+    letter-spacing: 0.02em;
   }
 
   /* SCROLLBARS */
@@ -551,6 +585,7 @@
   <button onclick="showPanel('players', this)">Players</button>
   <button onclick="showPanel('match', this)">Submit Match</button>
   <button onclick="showPanel('history', this)">Match History</button>
+  <button onclick="showPanel('rules', this)">Rules</button>
 </nav>
 
 <main>
@@ -587,14 +622,6 @@
             <label>Player Name</label>
             <input type="text" id="player-name" placeholder="Enter name…">
           </div>
-          <div class="field">
-            <label>Starting Rating (default 1500)</label>
-            <input type="number" id="player-rating" placeholder="1500">
-          </div>
-          <div class="field">
-            <label>Starting RD (default 120)</label>
-            <input type="number" id="player-rd" placeholder="120">
-          </div>
           <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
           <div class="msg" id="player-msg"></div>
         </div>
@@ -603,7 +630,6 @@
           <h2>RD Decay Settings</h2>
           <p style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.6">
             RD increases each inactive period using the Glicko-2 formula φ* = √(φ² + σ²).<br>
-            Decay is computed lazily on each page load and match submission — no server cron needed.<br>
             Default RD: 120 · Max RD: 200 · Hidden from leaderboard if RD > 100.
           </p>
           <div class="field">
@@ -661,6 +687,49 @@
       </select>
     </div>
     <div id="history-list"><div class="loading">Loading matches</div></div>
+  </div>
+  <!-- RULES -->
+  <div id="panel-rules" class="panel">
+    <div style="max-width:640px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.08em;color:var(--text);margin-bottom:1.5rem">House Rules</div>
+      <div class="rules-list">
+        <div class="rule-item">
+          <div class="rule-icon">11</div>
+          <div class="rule-body">
+            <div class="rule-title">First to 11</div>
+            <div class="rule-desc">Win by reaching 11 points with a 2-point lead.</div>
+          </div>
+        </div>
+        <div class="rule-item">
+          <div class="rule-icon">2×</div>
+          <div class="rule-body">
+            <div class="rule-title">2 Serves Each</div>
+            <div class="rule-desc">Players alternate with 2 serves per turn.</div>
+          </div>
+        </div>
+        <div class="rule-item">
+          <div class="rule-icon">∞</div>
+          <div class="rule-body">
+            <div class="rule-title">Deuce Serving</div>
+            <div class="rule-desc">At 10–10 (deuce), alternate serves every point.</div>
+          </div>
+        </div>
+        <div class="rule-item">
+          <div class="rule-icon">6″</div>
+          <div class="rule-body">
+            <div class="rule-title">Serve Height</div>
+            <div class="rule-desc">Ball must be struck 6 inches above the table surface.</div>
+          </div>
+        </div>
+        <div class="rule-item">
+          <div class="rule-icon">⚖</div>
+          <div class="rule-body">
+            <div class="rule-title">Fairness Rule</div>
+            <div class="rule-desc">Beating stronger players gains more ELO.</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -943,9 +1012,7 @@ function renderLeaderboard() {
 // ─── PLAYERS PANEL ───────────────────────────────────────────────────────────
 window.addPlayer = async function() {
   if (!db) return;
-  const name   = document.getElementById('player-name').value.trim();
-  const rating = parseFloat(document.getElementById('player-rating').value) || 1500;
-  const rd     = parseFloat(document.getElementById('player-rd').value) || 120;
+  const name = document.getElementById('player-name').value.trim();
   if (!name) { showMsg('player-msg', 'Name required.', true); return; }
   if (players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
     showMsg('player-msg', 'Player already exists.', true); return;
@@ -954,13 +1021,11 @@ window.addPlayer = async function() {
   btn.disabled = true;
   try {
     await addDoc(collection(db, 'players'), {
-      name, rating, rd, wins: 0, losses: 0,
+      name, rating: 1500, rd: 120, wins: 0, losses: 0,
       lastDecayAt: Date.now(),
       createdAt: serverTimestamp()
     });
-    document.getElementById('player-name').value   = '';
-    document.getElementById('player-rating').value = '';
-    document.getElementById('player-rd').value     = '';
+    document.getElementById('player-name').value = '';
     showMsg('player-msg', `${name} added!`);
   } catch(e) {
     showMsg('player-msg', 'Error: ' + e.message, true);
@@ -970,11 +1035,33 @@ window.addPlayer = async function() {
 };
 
 window.removePlayer = async function(firestoreId) {
-  if (!db || !confirm('Remove this player? Their match history will remain.')) return;
+  if (!db) return;
+  const pw = prompt('Enter admin password to remove player:');
+  if (pw !== 'admin') { alert('Incorrect password.'); return; }
+  if (!confirm('Remove this player? Their match history will remain.')) return;
   try {
     await deleteDoc(doc(db, 'players', firestoreId));
   } catch(e) {
     alert('Error removing player: ' + e.message);
+  }
+};
+
+// ─── ADMIN: EDIT PLAYER STATS ────────────────────────────────────────────────
+window.adminEditPlayer = async function(firestoreId) {
+  if (!db) return;
+  const pw = prompt('Enter admin password:');
+  if (pw !== 'admin') { alert('Incorrect password.'); return; }
+  const p = players.find(x => x.firestoreId === firestoreId);
+  if (!p) return;
+  const newRating = parseFloat(prompt(`New rating for ${p.name} (current: ${Math.round(p.rating)}):`, Math.round(p.rating)));
+  if (isNaN(newRating)) { alert('Invalid rating.'); return; }
+  const newRD = parseFloat(prompt(`New RD for ${p.name} (current: ${Math.round(p.rd)}):`, Math.round(p.rd)));
+  if (isNaN(newRD)) { alert('Invalid RD.'); return; }
+  try {
+    await updateDoc(doc(db, 'players', firestoreId), { rating: newRating, rd: newRD });
+    alert(`${p.name} updated.`);
+  } catch(e) {
+    alert('Error: ' + e.message);
   }
 };
 
@@ -1172,7 +1259,10 @@ function renderPlayersList() {
         </div>
         <div class="player-card-footer">
           <span style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em">CLICK TO VIEW PROFILE</span>
-          <button class="btn-danger" onclick="event.stopPropagation();window.removePlayer('${p.firestoreId}')">Remove</button>
+          <div style="display:flex;gap:0.5rem">
+            <button class="btn-danger" onclick="event.stopPropagation();window.removePlayer('${p.firestoreId}')">Remove</button>
+            <button class="btn-danger" style="background:var(--muted)" onclick="event.stopPropagation();window.adminEditPlayer('${p.firestoreId}')">Edit Stats</button>
+          </div>
         </div>
         <div onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:0.4rem;padding-top:0.5rem;border-top:1px solid var(--border)">
           <label style="margin-bottom:0">Player Quote</label>
@@ -1480,7 +1570,7 @@ function drawChart(points) {
     }
     for (let i = 1; i < points.length; i++) {
       const prev  = points[i - 1], cur = points[i];
-      const color = cur.won ? 'var(--win)' : '#ff4757';
+      const color = cur.won ? '#7ec8a0' : '#ff4757';
       ctx.beginPath();
       ctx.moveTo(xOf(i-1), yOf(prev.rating)); ctx.lineTo(xOf(i), yOf(cur.rating));
       ctx.lineTo(xOf(i), H - PAD.bottom); ctx.lineTo(xOf(i-1), H - PAD.bottom); ctx.closePath();
@@ -1490,7 +1580,7 @@ function drawChart(points) {
     }
     for (let i = 0; i < points.length; i++) {
       const pt    = points[i];
-      const color = i === 0 ? '#8a6a78' : (pt.won ? 'var(--win)' : '#ff4757');
+      const color = i === 0 ? '#8a6a78' : (pt.won ? '#7ec8a0' : '#ff4757');
       const isHl  = i === hlIdx;
       if (isHl) {
         ctx.beginPath(); ctx.arc(xOf(i), yOf(pt.rating), 9, 0, Math.PI*2);
@@ -1513,7 +1603,7 @@ function drawChart(points) {
 
   function showTooltip(idx) {
     const pt       = points[idx];
-    const colorHex = idx === 0 ? '#8a6a78' : (pt.won ? 'var(--win)' : '#ff4757');
+    const colorHex = idx === 0 ? '#8a6a78' : (pt.won ? '#7ec8a0' : '#ff4757');
     let html = `<span style="font-family:'Bebas Neue',sans-serif;font-size:1.15rem;color:${colorHex}">${Math.round(pt.rating)}</span>`;
     if (idx === 0) {
       html += `<br><span style="color:#8a6a78">Starting rating</span>`;
