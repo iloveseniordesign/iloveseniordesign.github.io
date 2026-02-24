@@ -831,7 +831,7 @@ function renderLeaderboard(){
     const sBadge=lastS?(()=>{const rk=lastS.rank,cls=rk===1?'rank1':rk===2?'rank2':rk===3?'rank3':'rankN',emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';return`<span class="s-badge ${cls}" title="Last season: ${esc(lastS.seasonName||'Season '+lastS.seasonNum)}" style="font-size:.6rem;padding:.12rem .35rem">${emoji}${emoji?'':('#'+rk)}</span>`})():'';
     const no1Since=p.no1Since||null;
     const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--accent3);margin-left:.35rem;letter-spacing:.03em">👑 —</span>`:'';
-    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}${no1Tag}</div></td><td><span class="rating-val">${Math.round(p.rating)}</span></td><td><span class="rd-val">±${Math.round(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
+    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}${no1Tag}</div></td><td><span class="rating-val">${r2(p.rating)}</span></td><td><span class="rd-val">±${r2(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
   }).join('')+(sorted.length>vis.length?`<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
 }
 
@@ -871,8 +871,8 @@ function makeCard(p){
     <div class="pc-header">${av}<div class="pc-name-block"><div class="pc-name">${esc(p.name)}</div>${rdH?'<span class="pc-tag">HIDDEN</span>':''}</div></div>
     ${badgesHtml}
     <div class="pc-stats">
-      <div class="pc-stat"><span class="pc-stat-l">Rating</span><span class="pc-stat-v" style="color:var(--accent)">${Math.round(p.rating)}</span></div>
-      <div class="pc-stat"><span class="pc-stat-l">RD</span><span class="pc-stat-v" style="color:${rdC}">±${Math.round(p.rd)}</span></div>
+      <div class="pc-stat"><span class="pc-stat-l">Rating</span><span class="pc-stat-v" style="color:var(--accent)">${r2(p.rating)}</span></div>
+      <div class="pc-stat"><span class="pc-stat-l">RD</span><span class="pc-stat-v" style="color:${rdC}">±${r2(p.rd)}</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Record</span><span class="pc-stat-v">${p.wins}W–${p.losses}L</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Win%</span><span class="pc-stat-v" style="color:${wc}">${wr}%</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Streak</span><span class="pc-stat-v" style="color:${sc}">${ls>0?ls+'W':'—'}</span></div>
@@ -904,7 +904,7 @@ window.showSeasonData=function(sel,dataId){
   el.style.display='block';
   el.innerHTML=`<strong>${emoji}${esc(s.seasonName||('Season '+s.seasonNum))}</strong><br>
     Final Rank: <strong style="color:${rk===1?'var(--accent)':rk===2?'#c0c0c0':rk===3?'#cd7f32':'var(--text)'}">#${rk}</strong><br>
-    Final Rating: <strong style="color:var(--accent)">${Math.round(s.rating)}</strong> ±${Math.round(s.rd)}<br>
+    Final Rating: <strong style="color:var(--accent)">${r2(s.rating)}</strong> ±${r2(s.rd)}<br>
     Record: <strong>${s.wins}W – ${s.losses}L</strong><br>
     Season ended: ${ended}`;
 };
@@ -978,6 +978,7 @@ function pStats(fid){
   return{ls,la};
 }
 function toTs(m){return m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();}
+const r2=v=>Number(v).toFixed(2);
 function fmtDur(ms){if(ms<=0)return'—';const d=Math.floor(ms/864e5),h=Math.floor((ms%864e5)/36e5);if(d>0)return d+'d '+h+'h';const m2=Math.floor((ms%36e5)/6e4);if(h>0)return h+'h '+m2+'m';return m2+'m';}
 function tickNo1Timers(){
   const now=Date.now();
@@ -1242,7 +1243,7 @@ window.submitMatch=async function(){
   catch(e){showMsg('match-msg','Error: '+e.message,true);}finally{btn.disabled=false;}
 };
 function renderMatchSelects(){
-  const opts=players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)} (${Math.round(p.rating)})</option>`).join('');
+  const opts=players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)} (${r2(p.rating)})</option>`).join('');
   document.getElementById('match-winner').innerHTML=opts||'<option disabled>No players yet</option>';
   document.getElementById('match-loser').innerHTML=opts||'<option disabled>No players yet</option>';
 }
@@ -1263,9 +1264,9 @@ window.renderHistory=function(){
     const ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),ti=ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     const d1=(m.p1delta>=0?'+':'')+m.p1delta,d2=(m.p2delta>=0?'+':'')+m.p2delta;
     return`<div class="match-row">
-      <div class="match-player"><span class="name">${esc(m.p1name)}</span><span class="delta ${m.p1delta>=0?'pos':'neg'}">${d1} (${Math.round(m.p1oldRating)}→${Math.round(m.p1newRating)})</span><span class="rdi">RD:±${Math.round(m.p1newRD)}</span></div>
+      <div class="match-player"><span class="name">${esc(m.p1name)}</span><span class="delta ${m.p1delta>=0?'pos':'neg'}">${d1} (${r2(m.p1oldRating)}→${r2(m.p1newRating)})</span><span class="rdi">RD:±${r2(m.p1newRD)}</span></div>
       <div class="match-mid"><div class="match-result"><span class="ws">WIN</span>${m.matchScore?`<span class="match-score-lbl">${esc(m.matchScore)}</span>`:'<span style="font-size:.8rem;color:var(--muted)">vs</span>'}<span class="ls">LOSS</span></div></div>
-      <div class="match-player" style="text-align:right"><span class="name">${esc(m.p2name)}</span><span class="delta ${m.p2delta>=0?'pos':'neg'}">${d2} (${Math.round(m.p2oldRating)}→${Math.round(m.p2newRating)})</span><span class="rdi">RD:±${Math.round(m.p2newRD)}</span></div>
+      <div class="match-player" style="text-align:right"><span class="name">${esc(m.p2name)}</span><span class="delta ${m.p2delta>=0?'pos':'neg'}">${d2} (${r2(m.p2oldRating)}→${r2(m.p2newRating)})</span><span class="rdi">RD:±${r2(m.p2newRD)}</span></div>
       <div class="match-meta-col">${ds} · ${ti}</div>
     </div>`;
   }).join('');
@@ -1278,7 +1279,7 @@ function renderAdminPanel(){
   updateDecayInfo();
   const sorted=[...players].sort((a,b)=>b.rating-a.rating);
   const pl=document.getElementById('admin-players-list');
-  if(pl)pl.innerHTML=sorted.length?sorted.map(p=>`<div class="admin-prow"><span class="admin-pname">${esc(p.name)}</span><span class="admin-prating">${Math.round(p.rating)} ±${Math.round(p.rd)}</span><button class="btn-admin" onclick="openEditPlayer('${p.firestoreId}')">Edit Stats</button><button class="btn-danger" onclick="adminRemovePlayer('${p.firestoreId}','${esc(p.name)}')">Remove</button></div>`).join(''):'<div class="empty">No players.</div>';
+  if(pl)pl.innerHTML=sorted.length?sorted.map(p=>`<div class="admin-prow"><span class="admin-pname">${esc(p.name)}</span><span class="admin-prating">${r2(p.rating)} ±${r2(p.rd)}</span><button class="btn-admin" onclick="openEditPlayer('${p.firestoreId}')">Edit Stats</button><button class="btn-danger" onclick="adminRemovePlayer('${p.firestoreId}','${esc(p.name)}')">Remove</button></div>`).join(''):'<div class="empty">No players.</div>';
   const ml=document.getElementById('admin-matches-list');
   if(ml)ml.innerHTML=matches.length?matches.slice(0,60).map(m=>{
     const ts=m.date?.toDate?m.date.toDate():new Date(m.date);
@@ -1727,8 +1728,8 @@ window.openProfile=async function(fid){
         ?`<span class="no1-timer counting" data-since="${Date.now()}">👑 —</span>`
         :fmtDur(liveP.longestNo1Ms||la);
     document.getElementById('profile-stats').innerHTML=`
-    <div class="m-stat"><span class="m-stat-l">Rating</span><span class="m-stat-v">${Math.round(liveP.rating)}</span></div>
-    <div class="m-stat"><span class="m-stat-l">RD</span><span class="m-stat-v neutral">±${Math.round(liveP.rd)}</span></div>
+    <div class="m-stat"><span class="m-stat-l">Rating</span><span class="m-stat-v">${r2(liveP.rating)}</span></div>
+    <div class="m-stat"><span class="m-stat-l">RD</span><span class="m-stat-v neutral">±${r2(liveP.rd)}</span></div>
     <div class="m-stat"><span class="m-stat-l">Record</span><span class="m-stat-v neutral">${liveP.wins}W–${liveP.losses}L</span></div>
     <div class="m-stat"><span class="m-stat-l">Win%</span><span class="m-stat-v ${wc}">${wr}%</span></div>
     <div class="m-stat"><span class="m-stat-l">Streak</span><span class="m-stat-v ${ls>=5?'green':ls>=3?'':'neutral'}">${ls>0?ls+'W':'—'}</span></div>
@@ -1747,7 +1748,7 @@ window.openProfile=async function(fid){
     return pm.length?[...pm].reverse().map(m=>{
       const i1=m.p1id===fid,won=i1?m.score===1:m.score===0,opp=i1?m.p2name:m.p1name,delta=i1?m.p1delta:m.p2delta,oldR=i1?m.p1oldRating:m.p2oldRating,newR=i1?m.p1newRating:m.p2newRating;
       const ts=m.date?.toDate?m.date.toDate():new Date(m.date),ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),ti=ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),df=(delta>=0?'+':'')+delta;
-      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds} · ${ti}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${Math.round(oldR)}→${Math.round(newR)}</span></span></div>`;
+      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds} · ${ti}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${r2(oldR)}→${r2(newR)}</span></span></div>`;
     }).join(''):'<div class="empty">No matches this season yet.</div>';
   }
 
@@ -1787,7 +1788,7 @@ window.loadProfileSeason=async function(fid,val){
     el.innerHTML=sorted.length?sorted.map(m=>{
       const i1=m.p1id===fid,won=i1?m.score===1:m.score===0,opp=i1?m.p2name:m.p1name,delta=i1?m.p1delta:m.p2delta,oldR=i1?m.p1oldRating:m.p2oldRating,newR=i1?m.p1newRating:m.p2newRating;
       const ts=m.date?.toDate?m.date.toDate():new Date(m.date),ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),df=(delta>=0?'+':'')+delta;
-      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${Math.round(oldR)}→${Math.round(newR)}</span></span></div>`;
+      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${r2(oldR)}→${r2(newR)}</span></span></div>`;
     }).join(''):'<div class="empty">No matches this season yet.</div>';
     return;
   }
@@ -1808,7 +1809,7 @@ window.loadProfileSeason=async function(fid,val){
       const streakHtml=sEntry.longestWinStreak>0?` · Best streak <strong style="color:var(--win)">${sEntry.longestWinStreak}W</strong>`:'';
       const no1Html=sEntry.longestNo1Ms>0?` · Longest #1 <strong style="color:var(--accent3)">${fmtDur(sEntry.longestNo1Ms)}</strong>`:'';
       headerHtml=`<div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);padding:.55rem .75rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.65rem;line-height:1.8">
-        ${emoji} <strong style="color:var(--text)">${esc(sEntry.seasonName||'Season '+sEntry.seasonNum)}</strong> · Final rank <strong style="color:var(--accent)">#${sEntry.rank}</strong> · ${sEntry.wins}W–${sEntry.losses}L · Rating <strong style="color:var(--accent)">${Math.round(sEntry.rating)}</strong>${streakHtml}${no1Html}${ended?' · Ended '+ended:''}
+        ${emoji} <strong style="color:var(--text)">${esc(sEntry.seasonName||'Season '+sEntry.seasonNum)}</strong> · Final rank <strong style="color:var(--accent)">#${sEntry.rank}</strong> · ${sEntry.wins}W–${sEntry.losses}L · Rating <strong style="color:var(--accent)">${r2(sEntry.rating)}</strong>${streakHtml}${no1Html}${ended?' · Ended '+ended:''}
       </div>`;
     }
     if(!ms.length){el.innerHTML=headerHtml+'<div class="empty">No matches recorded for this season.</div>';return;}
@@ -1816,7 +1817,7 @@ window.loadProfileSeason=async function(fid,val){
     el.innerHTML=headerHtml+sorted.map(m=>{
       const ds=new Date(m.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
       const df=(m.delta>=0?'+':'')+m.delta;
-      return`<div class="pm-row"><span class="pm-badge ${m.won?'win':'loss'}">${m.won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(m.opponent)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds}</span></div><span class="pm-delta ${m.delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${Math.round(m.oldRating)}→${Math.round(m.newRating)}</span></span></div>`;
+      return`<div class="pm-row"><span class="pm-badge ${m.won?'win':'loss'}">${m.won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(m.opponent)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds}</span></div><span class="pm-delta ${m.delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${r2(m.oldRating)}→${r2(m.newRating)}</span></span></div>`;
     }).join('');
   }catch(e){el.innerHTML=`<div class="empty">Error loading: ${esc(e.message)}</div>`;}
 };
@@ -1852,7 +1853,7 @@ function drawChart(points){
     for(let i=0;i<points.length;i++){const pt=points[i],col=i===0?'#8a6a78':(pt.won?'#7ec8a0':'#ff4757'),isHl=i===hl;if(isHl){ctx.beginPath();ctx.arc(xOf(i),yOf(pt.rating),8,0,Math.PI*2);ctx.fillStyle=i===0?'rgba(138,106,120,.2)':(pt.won?'rgba(126,200,160,.2)':'rgba(217,83,79,.2)');ctx.fill();}ctx.beginPath();ctx.arc(xOf(i),yOf(pt.rating),isHl?5:3.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();if(isHl){ctx.beginPath();ctx.arc(xOf(i),yOf(pt.rating),1.5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();}}
     if(hl>=0){ctx.beginPath();ctx.moveTo(xOf(hl),PAD.top);ctx.lineTo(xOf(hl),H-PAD.bottom);ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.stroke();ctx.setLineDash([]);}
   }
-  function showTip(idx){const pt=points[idx],col=idx===0?'#8a6a78':(pt.won?'#7ec8a0':'#ff4757');let html=`<span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${col}">${Math.round(pt.rating)}</span>`;if(idx===0)html+=`<br><span style="color:#8a6a78">Starting rating</span>`;else{const d=new Date(pt.date),ds=pt.rating-points[idx-1].rating,df=(ds>=0?'+':'')+Math.round(ds),dt=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+=`<br><span style="color:${col}">${pt.won?'WIN':'LOSS'}</span> vs ${esc(pt.label)}<br><span style="color:${col}">${df} pts</span> · ${dt}`;}tip.innerHTML=html;tip.style.display='block';tip.style.left='-9999px';tip.style.top='-9999px';requestAnimationFrame(()=>{const dx=xOf(idx),dy=yOf(pt.rating),tw=tip.offsetWidth,th=tip.offsetHeight;let l=Math.max(PAD.left,Math.min(dx-tw/2,W-PAD.right-tw)),t=dy-th-10;if(t<PAD.top)t=dy+14;tip.style.left=l+'px';tip.style.top=t+'px';});}
+  function showTip(idx){const pt=points[idx],col=idx===0?'#8a6a78':(pt.won?'#7ec8a0':'#ff4757');let html=`<span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${col}">${r2(pt.rating)}</span>`;if(idx===0)html+=`<br><span style="color:#8a6a78">Starting rating</span>`;else{const d=new Date(pt.date),ds=pt.rating-points[idx-1].rating,df=(ds>=0?'+':`${r2(Math.abs(ds))}`,dt=d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));html+=`<br><span style="color:${col}">${pt.won?'WIN':'LOSS'}</span> vs ${esc(pt.label)}<br><span style="color:${col}">${df} pts</span> · ${dt}`;}tip.innerHTML=html;tip.style.display='block';tip.style.left='-9999px';tip.style.top='-9999px';requestAnimationFrame(()=>{const dx=xOf(idx),dy=yOf(pt.rating),tw=tip.offsetWidth,th=tip.offsetHeight;let l=Math.max(PAD.left,Math.min(dx-tw/2,W-PAD.right-tw)),t=dy-th-10;if(t<PAD.top)t=dy+14;tip.style.left=l+'px';tip.style.top=t+'px';});}
   redraw(-1);let hl=-1;
   function near(cx){let b=-1,bd=Infinity;for(let i=0;i<points.length;i++){const d=Math.abs(xOf(i)-cx);if(d<bd){bd=d;b=i;}}return bd<34?b:-1;}
   function onMove(e){const r=canvas.getBoundingClientRect(),cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left,idx=near(cx*(canvas.width/r.width));if(idx!==hl){hl=idx;redraw(idx);if(idx>=0)showTip(idx);else tip.style.display='none';}}
