@@ -707,9 +707,19 @@ function currentDecayPeriod(ms){
 
 function computeDecay(p){
   const ms=decayMs();
-  // Decay is purely global-clock based — matches don't affect the timer.
-  // basePeriod = which tick the player was last processed at (stored in lastDecayAt)
-  const lastProcessed=p.lastDecayAt||DECAY_EPOCH;
+  // Find the player's most recent match timestamp from in-memory matches array
+  // Use it as a floor — lastDecayAt can never be earlier than the last match
+  const pid=p.firestoreId;
+  let lastMatchTs=0;
+  for(const m of matches){
+    if(m.p1id===pid||m.p2id===pid){
+      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+      if(ts>lastMatchTs)lastMatchTs=ts;
+    }
+  }
+  // basePeriod: use the LATER of lastDecayAt and last match time
+  // so a stale lastDecayAt can never count periods before the last match
+  const lastProcessed=Math.max(p.lastDecayAt||DECAY_EPOCH, lastMatchTs||DECAY_EPOCH);
   const basePeriod=Math.floor((lastProcessed-DECAY_EPOCH)/ms);
   const nowPeriod=currentDecayPeriod(ms);
   const per=nowPeriod-basePeriod;
@@ -819,7 +829,8 @@ function renderLeaderboard(){
     const seasons=p.seasons||[];
     const lastS=seasons.length?seasons[seasons.length-1]:null;
     const sBadge=lastS?(()=>{const rk=lastS.rank,cls=rk===1?'rank1':rk===2?'rank2':rk===3?'rank3':'rankN',emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';return`<span class="s-badge ${cls}" title="Last season: ${esc(lastS.seasonName||'Season '+lastS.seasonNum)}" style="font-size:.6rem;padding:.12rem .35rem">${emoji}${emoji?'':('#'+rk)}</span>`})():'';
-    const no1Tag=i===0&&p.no1Since?`<span class="no1-timer" data-since="${p.no1Since}" style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--accent3);margin-left:.35rem;letter-spacing:.03em">👑 —</span>`:'';
+    const no1Since=p.no1Since||null;
+    const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--accent3);margin-left:.35rem;letter-spacing:.03em">👑 —</span>`:'';
     return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}${no1Tag}</div></td><td><span class="rating-val">${Math.round(p.rating)}</span></td><td><span class="rd-val">±${Math.round(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
   }).join('')+(sorted.length>vis.length?`<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
 }
@@ -865,7 +876,7 @@ function makeCard(p){
       <div class="pc-stat"><span class="pc-stat-l">Record</span><span class="pc-stat-v">${p.wins}W–${p.losses}L</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Win%</span><span class="pc-stat-v" style="color:${wc}">${wr}%</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Streak</span><span class="pc-stat-v" style="color:${sc}">${ls>0?ls+'W':'—'}</span></div>
-      <div class="pc-stat"><span class="pc-stat-l">Longest #1</span><span class="pc-stat-v" style="color:var(--accent3);font-size:.95rem">${p.no1Since?`<span class="no1-timer" data-since="${p.no1Since}">👑 —</span>`:fmtDur(p.longestNo1Ms||la)}</span></div>
+      <div class="pc-stat"><span class="pc-stat-l">Longest #1</span><span class="pc-stat-v" style="color:var(--accent3);font-size:.95rem">${(()=>{const vis=[...players].filter(x=>x.rd<=100).sort((a,b)=>b.rating-a.rating);const isTop=vis[0]?.firestoreId===p.firestoreId;const since=p.no1Since||null;return isTop?`<span class="no1-timer" data-since="${since||Date.now()}">👑 —</span>`:fmtDur(p.longestNo1Ms||la);})()}</span></div>
     </div>
     <div class="pc-foot"><span class="pc-hint">TAP TO VIEW PROFILE</span></div>
     ${histHtml}
@@ -1461,6 +1472,12 @@ window.repairAllRatings=async function(){
     const no1Starts={},longestNo1={};
     let lastRepairTs=null;
     const repairPeriodMs=decayMs();
+    // Seed initial #1 from very first match
+    if(allMatches.length){
+      const firstTs=allMatches[0].date?.toDate?allMatches[0].date.toDate().getTime():new Date(allMatches[0].date).getTime();
+      const initialTop=repairTop();
+      if(initialTop)no1Starts[initialTop]=firstTs;
+    }
     for(const m of allMatches){
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
       // Apply decay between matches
@@ -1474,8 +1491,8 @@ window.repairAllRatings=async function(){
             repairRds[id]=Math.min(phi*173.7178,RD_MAX);
           }
           const nowTop=repairTop();
-          if(wasTop&&nowTop!==wasTop){
-            if(no1Starts[wasTop]!=null){const dur=lastRepairTs+periods*repairPeriodMs-no1Starts[wasTop];longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,dur);delete no1Starts[wasTop];}
+          if(wasTop!==nowTop){
+            if(wasTop&&no1Starts[wasTop]!=null){const dur=lastRepairTs+periods*repairPeriodMs-no1Starts[wasTop];longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,dur);delete no1Starts[wasTop];}
             if(nowTop&&no1Starts[nowTop]==null)no1Starts[nowTop]=lastRepairTs+periods*repairPeriodMs;
           }
         }
@@ -1493,25 +1510,21 @@ window.repairAllRatings=async function(){
     // Finalize anyone still #1 now
     const currentTop=repairTop();
     for(const[pid,since] of Object.entries(no1Starts)){
-      if(pid===currentTop){
-        // Still #1 — keep no1Since, don't finalize longestNo1 yet (it's still counting)
-      } else {
+      if(pid!==currentTop){
         const dur=now-(since||now);longestNo1[pid]=Math.max(longestNo1[pid]||0,dur);
+        delete no1Starts[pid];
       }
+      // current #1 stays in no1Starts with their continuous streak start time
     }
-    // Add no1Since and longestNo1Ms to the updates
+    // Add no1Since and longestNo1Ms to the updates — always write for every player
     for(const p of players){
       const isCurrentTop=p.firestoreId===currentTop&&repairRds[p.firestoreId]<=100;
       const no1Since=isCurrentTop?(no1Starts[p.firestoreId]||now):null;
       const longestMs=longestNo1[p.firestoreId]||0;
-      const existing=updates.find(u=>u._key?.path?.segments?.join('/')?.includes(p.firestoreId));
-      // Just push a separate update for no1 fields — simpler than merging
-      if(no1Since!==undefined||longestMs>0){
-        updates.push(updateDoc(doc(db,'players',p.firestoreId),{
-          ...(no1Since!==null?{no1Since}:{no1Since:null}),
-          ...(longestMs>0?{longestNo1Ms:longestMs}:{})
-        }));
-      }
+      updates.push(updateDoc(doc(db,'players',p.firestoreId),{
+        no1Since:no1Since,
+        ...(longestMs>0?{longestNo1Ms:longestMs}:{})
+      }));
     }
 
     await Promise.all(updates);
@@ -1700,7 +1713,7 @@ window.openProfile=async function(fid){
     <div class="m-stat"><span class="m-stat-l">Record</span><span class="m-stat-v neutral">${p.wins}W–${p.losses}L</span></div>
     <div class="m-stat"><span class="m-stat-l">Win%</span><span class="m-stat-v ${wc}">${wr}%</span></div>
     <div class="m-stat"><span class="m-stat-l">Streak</span><span class="m-stat-v ${ls>=5?'green':ls>=3?'':'neutral'}">${ls>0?ls+'W':'—'}</span></div>
-    <div class="m-stat"><span class="m-stat-l">Longest #1</span><span class="m-stat-v" style="color:var(--accent3);font-size:1rem">${p.no1Since?`<span class="no1-timer counting" data-since="${p.no1Since}">👑 —</span>`:fmtDur(p.longestNo1Ms||la)}</span></div>`;
+    <div class="m-stat"><span class="m-stat-l">Longest #1</span><span class="m-stat-v" style="color:var(--accent3);font-size:1rem">${(()=>{const vis=[...players].filter(x=>x.rd<=100).sort((a,b)=>b.rating-a.rating);const isTop=vis[0]?.firestoreId===fid;const since=p.no1Since||null;return isTop?`<span class="no1-timer counting" data-since="${since||Date.now()}">👑 —</span>`:fmtDur(p.longestNo1Ms||la);})()}</span></div>`;
 
   const ids=new Set(players.map(x=>x.firestoreId));
   const pm=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)&&(m.p1id===fid||m.p2id===fid)).sort((a,b)=>toTs(a)-toTs(b));
