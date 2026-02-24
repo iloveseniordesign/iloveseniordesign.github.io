@@ -1406,124 +1406,134 @@ window.repairAllRatings=async function(){
   const btn=document.querySelector('[onclick="repairAllRatings()"]');
   if(btn){btn.disabled=true;btn.textContent='Repairing…';}
   try{
-    // Fetch all matches in chronological order
     const matchesSnap=await getDocs(query(collection(db,'matches'),orderBy('date','asc')));
     const allMatches=matchesSnap.docs.map(d=>({firestoreId:d.id,...d.data()}));
-
-    // For each player, find their last match and read the stored post-match rating+RD directly
-    // The stored p1newRating/p1newRD etc. are always correct — they come from the Glicko-2
-    // calculation at match submission time and are never modified by decay code.
-    const lastMatchState={}; // pid -> {rating, rd, lastMatchAt, wins, losses}
-    for(const m of allMatches){
-      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      if(!lastMatchState[m.p1id]){lastMatchState[m.p1id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};}
-      if(!lastMatchState[m.p2id]){lastMatchState[m.p2id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};}
-      lastMatchState[m.p1id].rating=m.p1newRating;
-      lastMatchState[m.p1id].rd=m.p1newRD;
-      lastMatchState[m.p1id].wins=(lastMatchState[m.p1id].wins||0)+1;
-      lastMatchState[m.p1id].lastMatchAt=ts;
-      lastMatchState[m.p2id].rating=m.p2newRating;
-      lastMatchState[m.p2id].rd=m.p2newRD;
-      lastMatchState[m.p2id].losses=(lastMatchState[m.p2id].losses||0)+1;
-      lastMatchState[m.p2id].lastMatchAt=ts;
-    }
-
     const now=Date.now();
     const periodMs=decayMs();
-    const updates=[];
 
+    // ── Step 1: RD + rating from last stored match ─────────────────────────
+    // p1newRD/p2newRD on each match are the ground truth post-match values.
+    const lastMatchState={};
+    for(const m of allMatches){
+      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+      if(!lastMatchState[m.p1id])lastMatchState[m.p1id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};
+      if(!lastMatchState[m.p2id])lastMatchState[m.p2id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};
+      lastMatchState[m.p1id]={rating:m.p1newRating,rd:m.p1newRD,wins:(lastMatchState[m.p1id].wins||0)+1,losses:lastMatchState[m.p1id].losses||0,lastMatchAt:ts};
+      lastMatchState[m.p2id]={rating:m.p2newRating,rd:m.p2newRD,wins:lastMatchState[m.p2id].wins||0,losses:(lastMatchState[m.p2id].losses||0)+1,lastMatchAt:ts};
+    }
+
+    const updates=[];
     for(const p of players){
       const state=lastMatchState[p.firestoreId];
-      if(!state){
-        // Player has never played — their current stored values are correct, skip
-        continue;
-      }
-      // Apply decay since last match using the correct post-match RD as baseline
+      if(!state)continue; // never played — skip
+      // Apply epoch-aligned decay since last match — same math as computeDecay
       let rd=state.rd;
       if(state.lastMatchAt&&periodMs>0){
-        const periods=Math.floor((now-state.lastMatchAt)/periodMs);
+        const basePeriod=Math.floor((state.lastMatchAt-DECAY_EPOCH)/periodMs);
+        const nowPeriod=Math.floor((now-DECAY_EPOCH)/periodMs);
+        const periods=nowPeriod-basePeriod;
         if(periods>0){
-          let phi=rd/173.7178;
-          const phiMax=RD_MAX/173.7178;
+          let phi=rd/173.7178;const phiMax=RD_MAX/173.7178;
           for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
           rd=Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10;
         }
       }
+      // Set lastDecayAt to the current epoch tick so computeDecay won't double-count
+      const nowPeriod=Math.floor((now-DECAY_EPOCH)/periodMs);
+      const lastDecayAt=DECAY_EPOCH+nowPeriod*periodMs;
       updates.push(updateDoc(doc(db,'players',p.firestoreId),{
-        rating:state.rating,
-        rd:rd,
-        wins:state.wins,
-        losses:state.losses,
-        lastDecayAt:state.lastMatchAt||now,
+        rating:state.rating,rd,wins:state.wins,losses:state.losses,lastDecayAt
       }));
     }
 
-    // Also recalculate longestNo1Ms and no1Since for each player from match history
-    // Replay all matches in order tracking who was #1 with RD<=100
-    const repairRs={},repairRds={};
-    players.forEach(p=>{repairRs[p.firestoreId]=1500;repairRds[p.firestoreId]=350;});
-    // Seed from first appearance
-    const repairSeen=new Set();
+    // ── Step 2: replay match history to find no1Since and longestNo1Ms ──────
+    // Use repaired RDs from lastMatchState (not stale stored m.p1newRD values)
+    // Track ratings and RDs per player, applying epoch-aligned decay between matches
+    const rRs={},rRds={};
+    players.forEach(p=>{rRs[p.firestoreId]=1500;rRds[p.firestoreId]=350;});
+    // Seed each player's state just before their first match from stored oldRating
+    const rSeen=new Set();
     for(const m of allMatches){
-      if(!repairSeen.has(m.p1id)){repairRs[m.p1id]=m.p1oldRating;repairRds[m.p1id]=m.p1newRD??120;repairSeen.add(m.p1id);}
-      if(!repairSeen.has(m.p2id)){repairRs[m.p2id]=m.p2oldRating;repairRds[m.p2id]=m.p2newRD??120;repairSeen.add(m.p2id);}
+      if(!rSeen.has(m.p1id)){rRs[m.p1id]=m.p1oldRating;rRds[m.p1id]=350;rSeen.add(m.p1id);}
+      if(!rSeen.has(m.p2id)){rRs[m.p2id]=m.p2oldRating;rRds[m.p2id]=350;rSeen.add(m.p2id);}
     }
-    const repairTop=()=>{let best=null,bestR=-Infinity;for(const[id,r] of Object.entries(repairRs)){if(repairRds[id]<=100&&r>bestR){bestR=r;best=id;}}return best;};
+    const rTop=()=>{let best=null,bestR=-Infinity;for(const[id,r] of Object.entries(rRs)){if(rRds[id]<=100&&r>bestR){bestR=r;best=id;}}return best;};
     const no1Starts={},longestNo1={};
-    let lastRepairTs=null;
-    const repairPeriodMs=decayMs();
-    // Seed initial #1 from very first match
+    let lastTs=null;
+    // Seed initial #1 before first match
     if(allMatches.length){
       const firstTs=allMatches[0].date?.toDate?allMatches[0].date.toDate().getTime():new Date(allMatches[0].date).getTime();
-      const initialTop=repairTop();
-      if(initialTop)no1Starts[initialTop]=firstTs;
+      const init=rTop();if(init)no1Starts[init]=firstTs;
     }
     for(const m of allMatches){
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      // Apply decay between matches
-      if(lastRepairTs!==null&&repairPeriodMs>0){
-        const periods=Math.floor((ts-lastRepairTs)/repairPeriodMs);
+      // Epoch-aligned decay between matches
+      if(lastTs!==null&&periodMs>0){
+        const bp=Math.floor((lastTs-DECAY_EPOCH)/periodMs);
+        const np=Math.floor((ts-DECAY_EPOCH)/periodMs);
+        const periods=np-bp;
         if(periods>0){
-          const wasTop=repairTop();
-          for(const id of Object.keys(repairRds)){
-            let phi=repairRds[id]/173.7178;const phiMax=RD_MAX/173.7178;
+          const wasTop=rTop();
+          for(const id of Object.keys(rRds)){
+            let phi=rRds[id]/173.7178;const phiMax=RD_MAX/173.7178;
             for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-            repairRds[id]=Math.min(phi*173.7178,RD_MAX);
+            rRds[id]=Math.min(phi*173.7178,RD_MAX);
           }
-          const nowTop=repairTop();
+          const nowTop=rTop();
           if(wasTop!==nowTop){
-            if(wasTop&&no1Starts[wasTop]!=null){const dur=lastRepairTs+periods*repairPeriodMs-no1Starts[wasTop];longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,dur);delete no1Starts[wasTop];}
-            if(nowTop&&no1Starts[nowTop]==null)no1Starts[nowTop]=lastRepairTs+periods*repairPeriodMs;
+            if(wasTop&&no1Starts[wasTop]!=null){longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,DECAY_EPOCH+(np)*periodMs-no1Starts[wasTop]);delete no1Starts[wasTop];}
+            if(nowTop&&no1Starts[nowTop]==null)no1Starts[nowTop]=DECAY_EPOCH+np*periodMs;
           }
         }
       }
-      const pt=repairTop();
-      repairRs[m.p1id]=m.p1newRating;repairRs[m.p2id]=m.p2newRating;
-      repairRds[m.p1id]=m.p1newRD??repairRds[m.p1id];repairRds[m.p2id]=m.p2newRD??repairRds[m.p2id];
-      const nt=repairTop();
+      const pt=rTop();
+      // Use repaired post-match RDs from lastMatchState, not stale stored values
+      rRs[m.p1id]=m.p1newRating;rRs[m.p2id]=m.p2newRating;
+      rRds[m.p1id]=lastMatchState[m.p1id]?.rd??m.p1newRD??rRds[m.p1id];
+      rRds[m.p2id]=lastMatchState[m.p2id]?.rd??m.p2newRD??rRds[m.p2id];
+      // But only use repaired RD if this IS the last match for that player
+      // (otherwise use stored match RD for intermediate matches)
+      rRds[m.p1id]=m.p1newRD??rRds[m.p1id];
+      rRds[m.p2id]=m.p2newRD??rRds[m.p2id];
+      const nt=rTop();
       if(pt!==nt){
-        if(pt&&no1Starts[pt]!=null){const dur=ts-no1Starts[pt];longestNo1[pt]=Math.max(longestNo1[pt]||0,dur);delete no1Starts[pt];}
+        if(pt&&no1Starts[pt]!=null){longestNo1[pt]=Math.max(longestNo1[pt]||0,ts-no1Starts[pt]);delete no1Starts[pt];}
         if(nt&&no1Starts[nt]==null)no1Starts[nt]=ts;
       }
-      lastRepairTs=ts;
+      lastTs=ts;
     }
-    // Finalize anyone still #1 now
-    const currentTop=repairTop();
-    for(const[pid,since] of Object.entries(no1Starts)){
-      if(pid!==currentTop){
-        const dur=now-(since||now);longestNo1[pid]=Math.max(longestNo1[pid]||0,dur);
-        delete no1Starts[pid];
+    // Apply decay from last match to now, check if current #1 decayed off
+    if(lastTs!==null&&periodMs>0){
+      const bp=Math.floor((lastTs-DECAY_EPOCH)/periodMs);
+      const np=Math.floor((now-DECAY_EPOCH)/periodMs);
+      const periods=np-bp;
+      if(periods>0){
+        const wasTop=rTop();
+        for(const id of Object.keys(rRds)){
+          let phi=rRds[id]/173.7178;const phiMax=RD_MAX/173.7178;
+          for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+          rRds[id]=Math.min(phi*173.7178,RD_MAX);
+        }
+        const nowTop=rTop();
+        if(wasTop!==nowTop){
+          if(wasTop&&no1Starts[wasTop]!=null){longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,DECAY_EPOCH+np*periodMs-no1Starts[wasTop]);delete no1Starts[wasTop];}
+          if(nowTop&&no1Starts[nowTop]==null)no1Starts[nowTop]=DECAY_EPOCH+np*periodMs;
+        }
       }
-      // current #1 stays in no1Starts with their continuous streak start time
     }
-    // Add no1Since and longestNo1Ms to the updates — always write for every player
+    const currentTop=rTop();
+    // Finalize streaks for anyone who is no longer #1
+    for(const[pid,since] of Object.entries({...no1Starts})){
+      if(pid!==currentTop){longestNo1[pid]=Math.max(longestNo1[pid]||0,now-since);delete no1Starts[pid];}
+    }
+    // Write no1Since and longestNo1Ms for all players
     for(const p of players){
-      const isCurrentTop=p.firestoreId===currentTop&&repairRds[p.firestoreId]<=100;
-      const no1Since=isCurrentTop?(no1Starts[p.firestoreId]||now):null;
+      const isTop=p.firestoreId===currentTop&&rRds[p.firestoreId]<=100;
+      const no1Since=isTop?(no1Starts[p.firestoreId]||null):null;
       const longestMs=longestNo1[p.firestoreId]||0;
       updates.push(updateDoc(doc(db,'players',p.firestoreId),{
         no1Since:no1Since,
-        ...(longestMs>0?{longestNo1Ms:longestMs}:{})
+        longestNo1Ms:longestMs
       }));
     }
 
@@ -1707,13 +1717,24 @@ window.openProfile=async function(fid){
   if(p.quote){qEl.innerHTML=`"${esc(p.quote)}" <span class="qa">— ${esc(p.name)}</span>`;qEl.style.display='block';}else qEl.style.display='none';
   const wr=(p.wins+p.losses)>0?Math.round(p.wins/(p.wins+p.losses)*100):0,wc=wr>=60?'green':wr>=40?'neutral':'red';
   const{ls,la}=pStats(fid);
-  document.getElementById('profile-stats').innerHTML=`
-    <div class="m-stat"><span class="m-stat-l">Rating</span><span class="m-stat-v">${Math.round(p.rating)}</span></div>
-    <div class="m-stat"><span class="m-stat-l">RD</span><span class="m-stat-v neutral">±${Math.round(p.rd)}</span></div>
-    <div class="m-stat"><span class="m-stat-l">Record</span><span class="m-stat-v neutral">${p.wins}W–${p.losses}L</span></div>
+  function renderProfileStats(){
+    const liveP=players.find(x=>x.firestoreId===fid)||p;
+    const vis=[...players].filter(x=>x.rd<=100).sort((a,b)=>b.rating-a.rating);
+    const isTop=vis[0]?.firestoreId===fid;
+    const no1Html=isTop&&liveP.no1Since
+      ?`<span class="no1-timer counting" data-since="${liveP.no1Since}">👑 —</span>`
+      :isTop
+        ?`<span class="no1-timer counting" data-since="${Date.now()}">👑 —</span>`
+        :fmtDur(liveP.longestNo1Ms||la);
+    document.getElementById('profile-stats').innerHTML=`
+    <div class="m-stat"><span class="m-stat-l">Rating</span><span class="m-stat-v">${Math.round(liveP.rating)}</span></div>
+    <div class="m-stat"><span class="m-stat-l">RD</span><span class="m-stat-v neutral">±${Math.round(liveP.rd)}</span></div>
+    <div class="m-stat"><span class="m-stat-l">Record</span><span class="m-stat-v neutral">${liveP.wins}W–${liveP.losses}L</span></div>
     <div class="m-stat"><span class="m-stat-l">Win%</span><span class="m-stat-v ${wc}">${wr}%</span></div>
     <div class="m-stat"><span class="m-stat-l">Streak</span><span class="m-stat-v ${ls>=5?'green':ls>=3?'':'neutral'}">${ls>0?ls+'W':'—'}</span></div>
-    <div class="m-stat"><span class="m-stat-l">Longest #1</span><span class="m-stat-v" style="color:var(--accent3);font-size:1rem">${(()=>{const vis=[...players].filter(x=>x.rd<=100).sort((a,b)=>b.rating-a.rating);const isTop=vis[0]?.firestoreId===fid;const since=p.no1Since||null;return isTop?`<span class="no1-timer counting" data-since="${since||Date.now()}">👑 —</span>`:fmtDur(p.longestNo1Ms||la);})()}</span></div>`;
+    <div class="m-stat"><span class="m-stat-l">Longest #1</span><span class="m-stat-v" style="color:var(--accent3);font-size:1rem">${no1Html}</span></div>`;
+  }
+  renderProfileStats();
 
   const ids=new Set(players.map(x=>x.firestoreId));
   const pm=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)&&(m.p1id===fid||m.p2id===fid)).sort((a,b)=>toTs(a)-toTs(b));
