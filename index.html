@@ -461,6 +461,15 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       </div>
 
       <div class="admin-section">
+        <div class="admin-stitle">Repair Ratings</div>
+        <div class="form-card" style="border-color:rgba(201,160,220,.15);max-width:480px">
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Recalculates every player's rating and RD directly from their last stored match result, then applies any accumulated decay since that match. Use this to fix any players whose RD was incorrectly reset.</p>
+          <button class="btn-admin" onclick="repairAllRatings()" style="font-size:.68rem;padding:.65rem 1.2rem">🔧 Repair All Ratings From Match History</button>
+          <div class="msg" id="repair-msg" style="margin-top:.65rem"></div>
+        </div>
+      </div>
+
+      <div class="admin-section">
         <div class="admin-stitle">Manage Players</div>
         <div id="admin-players-list"><div class="loading">Loading</div></div>
       </div>
@@ -647,7 +656,7 @@ window.submitAdminLogin=function(){
 // ── LISTENERS ────────────────────────────────────────────────────────────────
 onSnapshot(query(collection(db,'players'),orderBy('rating','desc')),snap=>{
   players=snap.docs.map(d=>({firestoreId:d.id,...d.data()}));
-  applyDecayLocally();renderLeaderboard();renderPlayersList();renderMatchSelects();updateDecayStatus();
+  renderLeaderboard();renderPlayersList();renderMatchSelects();updateDecayStatus();
   if(isAdmin)renderAdminPanel();
 },err=>console.error(err));
 
@@ -1288,6 +1297,76 @@ window.adminRemoveMatch=async function(fid){
     await Promise.all([...writes,...matchUpdates]);
     alert('Match deleted and ratings recalculated from that point forward.');
   }catch(e){alert('Error: '+e.message);console.error(e);}
+};
+
+// ── REPAIR RATINGS FAILSAFE ─────────────────────────────────────────────────
+// Derives each player's true rating+RD purely from their last stored match record
+// (which always has correct p1newRating/p1newRD/p2newRating/p2newRD), then applies
+// decay since that match. Never uses the player doc's current rating/rd as input.
+window.repairAllRatings=async function(){
+  if(!confirm('Recalculate all ratings and RDs from match history? This will fix any incorrectly reset values.'))return;
+  const btn=document.querySelector('[onclick="repairAllRatings()"]');
+  if(btn){btn.disabled=true;btn.textContent='Repairing…';}
+  try{
+    // Fetch all matches in chronological order
+    const matchesSnap=await getDocs(query(collection(db,'matches'),orderBy('date','asc')));
+    const allMatches=matchesSnap.docs.map(d=>({firestoreId:d.id,...d.data()}));
+
+    // For each player, find their last match and read the stored post-match rating+RD directly
+    // The stored p1newRating/p1newRD etc. are always correct — they come from the Glicko-2
+    // calculation at match submission time and are never modified by decay code.
+    const lastMatchState={}; // pid -> {rating, rd, lastMatchAt, wins, losses}
+    for(const m of allMatches){
+      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+      if(!lastMatchState[m.p1id]){lastMatchState[m.p1id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};}
+      if(!lastMatchState[m.p2id]){lastMatchState[m.p2id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};}
+      lastMatchState[m.p1id].rating=m.p1newRating;
+      lastMatchState[m.p1id].rd=m.p1newRD;
+      lastMatchState[m.p1id].wins=(lastMatchState[m.p1id].wins||0)+1;
+      lastMatchState[m.p1id].lastMatchAt=ts;
+      lastMatchState[m.p2id].rating=m.p2newRating;
+      lastMatchState[m.p2id].rd=m.p2newRD;
+      lastMatchState[m.p2id].losses=(lastMatchState[m.p2id].losses||0)+1;
+      lastMatchState[m.p2id].lastMatchAt=ts;
+    }
+
+    const now=Date.now();
+    const periodMs=decayMs();
+    const updates=[];
+
+    for(const p of players){
+      const state=lastMatchState[p.firestoreId];
+      if(!state){
+        // Player has never played — their current stored values are correct, skip
+        continue;
+      }
+      // Apply decay since last match using the correct post-match RD as baseline
+      let rd=state.rd;
+      if(state.lastMatchAt&&periodMs>0){
+        const periods=Math.floor((now-state.lastMatchAt)/periodMs);
+        if(periods>0){
+          let phi=rd/173.7178;
+          const phiMax=RD_MAX/173.7178;
+          for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+          rd=Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10;
+        }
+      }
+      updates.push(updateDoc(doc(db,'players',p.firestoreId),{
+        rating:state.rating,
+        rd:rd,
+        wins:state.wins,
+        losses:state.losses,
+        lastDecayAt:state.lastMatchAt||now,
+      }));
+    }
+
+    await Promise.all(updates);
+    showMsg('repair-msg',`Repaired ${updates.length} player(s) from match history.`);
+  }catch(e){
+    showMsg('repair-msg','Error: '+e.message,true);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='🔧 Repair All Ratings From Match History';}
+  }
 };
 
 window.openEditPlayer=function(fid){
