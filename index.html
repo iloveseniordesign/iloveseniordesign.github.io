@@ -53,8 +53,8 @@ nav button.admin-tab.active{color:var(--admin);border-bottom-color:var(--admin);
 nav button:hover:not(.active){color:var(--text);}
 
 /* MAIN */
-main{padding:1.25rem;position:relative;z-index:1;width:100%;}
-.panel{display:none;}.panel.active{display:block;}
+main{padding:1.25rem;position:relative;z-index:1;width:100%;overflow-x:hidden;}
+.panel{display:none;}.panel.active{display:block;width:100%;overflow-x:hidden;}
 
 /* LEADERBOARD */
 .lb-table{width:100%;border-collapse:collapse;}
@@ -132,9 +132,10 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
 
 /* PLAYER CARDS */
 .cards-label{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;color:var(--muted);margin-bottom:.65rem;}
-.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.65rem;}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:.65rem;width:100%;}
 .player-card{background:var(--surface);border:1px solid var(--border);padding:.9rem;cursor:pointer;
-  transition:border-color .2s,transform .15s;display:flex;flex-direction:column;gap:.65rem;}
+  transition:border-color .2s,transform .15s;display:flex;flex-direction:column;gap:.65rem;
+  min-width:0;max-width:100%;box-sizing:border-box;}
 .player-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 18px rgba(229,178,93,.1);}
 .pc-header{display:flex;align-items:center;gap:.65rem;}
 .pc-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--border);background:var(--bg);flex-shrink:0;}
@@ -295,6 +296,9 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
 @media(max-width:899px){
   #players-list-desktop{display:none;}
   .players-sidebar-mobile{display:block;}
+  .players-layout{width:100%;}
+  .players-sidebar{width:100%;max-width:100%;}
+  .form-card{width:100%;max-width:100%;box-sizing:border-box;}
 }
 .match-meta-col{display:none;}
 </style>
@@ -402,7 +406,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.08em;color:var(--text);margin:1.75rem 0 1.1rem">Rating System</div>
       <div class="rules-list">
         <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">RD</div><div><div class="rule-title">Rating Deviation</div><div class="rule-desc">RD measures how confident the system is in a player's rating. A low RD means the rating is reliable; a high RD means more uncertainty. New players start at RD 120. After enough games, RD can drop below 100 — only then does a player appear on the leaderboard. RD also decreases as you play more matches.</div></div></div>
-        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">⏱ RD</div><div><div class="rule-title">RD Decay (Inactivity)</div><div class="rule-desc">If you stop playing, your RD slowly increases over time — because the system becomes less certain your rating is still accurate. This happens on a configurable timer (default: every 7 days of inactivity). Each period of inactivity increases RD using the Glicko-2 formula φ* = √(φ² + σ²). RD is capped at 200. If your RD rises above 100 you'll be hidden from the leaderboard until you play again.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">⏱ RD</div><div><div class="rule-title">RD Decay (Inactivity)</div><div class="rule-desc">If you stop playing, your RD slowly increases over time — because the system becomes less certain your rating is still accurate. This happens on a configurable timer (default: every 4 hours of inactivity). Each period of inactivity increases RD using the Glicko-2 formula φ* = √(φ² + σ²). RD is capped at 200. If your RD rises above 100 you'll be hidden from the leaderboard until you play again.</div></div></div>
         <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">G2</div><div><div class="rule-title">Glicko-2 Algorithm</div><div class="rule-desc">Uses Glicko-2, an improvement on ELO. Every match updates both players' ratings based on expected outcome — upsets gain more, expected wins gain less. Starting rating: 1500.</div></div></div>
       </div>
     </div>
@@ -436,18 +440,18 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       <div class="admin-section">
         <div class="admin-stitle">RD Decay Settings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.15);max-width:480px">
-          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">RD increases each inactive period using the Glicko-2 formula <strong style="color:var(--text)">φ* = √(φ² + σ²)</strong>. Default: 7 days · Max RD: 200 · Hidden from leaderboard if RD &gt; 100.</p>
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">RD increases each inactive period using the Glicko-2 formula <strong style="color:var(--text)">φ* = √(φ² + σ²)</strong>. Default: 4 hours · Max RD: 200 · Hidden from leaderboard if RD &gt; 100.</p>
           <div id="decay-info" style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);line-height:1.8;padding:.6rem .8rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.9rem">
             Loading current settings…
           </div>
           <div class="field">
             <label>Decay Period</label>
             <div style="display:flex;gap:.6rem">
-              <input type="number" id="decay-amount" value="7" min="1" style="width:90px;flex-shrink:0;flex:none">
+              <input type="number" id="decay-amount" value="4" min="1" style="width:90px;flex-shrink:0;flex:none">
               <select id="decay-unit">
                 <option value="minutes">Minutes</option>
-                <option value="hours">Hours</option>
-                <option value="days" selected>Days</option>
+                <option value="hours" selected>Hours</option>
+                <option value="days">Days</option>
               </select>
             </div>
           </div>
@@ -508,7 +512,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
           <div class="m-stats" id="profile-stats"></div>
           <div class="m-quote" id="profile-quote" style="display:none"></div>
           <div class="quote-row">
-            <input type="text" id="quote-input-modal" placeholder='"A memorable quote…"'>
+            <input type="text" id="quote-input-modal" placeholder='"Leaderboard quote…"'>
             <button class="btn" onclick="saveQuoteModal()">Save</button>
           </div>
           <div class="msg" id="quote-msg-modal" style="margin-top:.35rem;padding:.3rem .6rem;font-size:.58rem"></div>
@@ -1191,17 +1195,36 @@ window.adminRemoveMatch=async function(fid){
     await deleteDoc(doc(db,'matches',fid));
     const matchesBefore=allMatches.slice(0,deletedIdx);
     const matchesAfter=allMatches.slice(deletedIdx+1);
+    // Figure out which player IDs actually appear in matchesAfter — only those need rewriting.
+    // Players who only appear in matchesBefore (or not at all) must NOT be touched,
+    // otherwise we'd overwrite their legitimate RD with the seeded value of 120.
+    const affectedIds=new Set();
+    matchesAfter.forEach(m=>{affectedIds.add(m.p1id);affectedIds.add(m.p2id);});
+    // Always include the two players from the deleted match itself
+    affectedIds.add(deletedMatch.p1id);affectedIds.add(deletedMatch.p2id);
+
+    // Build playerMap only for affected players, seeding from actual Firestore data
+    // then replaying matchesBefore to get their pre-deletion-point state.
     const playersSnap=await getDocs(collection(db,'players'));
     const playerMap={};
     playersSnap.docs.forEach(d=>{
-      playerMap[d.id]={firestoreId:d.id,...d.data(),rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};
+      if(!affectedIds.has(d.id))return; // skip unaffected players entirely
+      // Seed from Firestore data (preserves real RD for players with no matches at all)
+      // but we'll overwrite via replay below for players who do have matches
+      playerMap[d.id]={firestoreId:d.id,...d.data(),wins:0,losses:0,lastMatchAt:null};
+      // Reset rating/rd/wins/losses to baseline — replay will reconstruct correct values
+      playerMap[d.id].rating=1500;playerMap[d.id].rd=120;
     });
+
+    // Replay matchesBefore to reconstruct each affected player's state just before the deleted match
     for(const m of matchesBefore){
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
       if(playerMap[m.p1id]){playerMap[m.p1id].rating=m.p1newRating;playerMap[m.p1id].rd=m.p1newRD;playerMap[m.p1id].wins=(playerMap[m.p1id].wins||0)+1;playerMap[m.p1id].lastMatchAt=ts;}
       if(playerMap[m.p2id]){playerMap[m.p2id].rating=m.p2newRating;playerMap[m.p2id].rd=m.p2newRD;playerMap[m.p2id].losses=(playerMap[m.p2id].losses||0)+1;playerMap[m.p2id].lastMatchAt=ts;}
     }
+
     if(matchesAfter.length===0){
+      // No matches after — just rewind the two involved players, touch nobody else
       const wState=playerStateFromHistory(matchesBefore,deletedMatch.p1id);
       const lState=playerStateFromHistory(matchesBefore,deletedMatch.p2id);
       await Promise.all([
@@ -1211,6 +1234,7 @@ window.adminRemoveMatch=async function(fid){
       alert('Match deleted. Ratings rewound to previous state.');
       return;
     }
+
     const periodMs=decayMs();
     const matchUpdates=[];
     for(const m of matchesAfter){
@@ -1226,6 +1250,7 @@ window.adminRemoveMatch=async function(fid){
       playerMap[m.p2id].rating=ul.rating;playerMap[m.p2id].rd=ul.rd;playerMap[m.p2id].losses=(playerMap[m.p2id].losses||0)+1;playerMap[m.p2id].lastMatchAt=ts;
       matchUpdates.push(updateDoc(doc(db,'matches',m.firestoreId),{p1delta,p2delta,p1oldRating:w.rating,p1newRating:uw.rating,p2oldRating:l.rating,p2newRating:ul.rating,p1newRD:uw.rd,p2newRD:ul.rd}));
     }
+    // Only write back the affected players — everyone else is untouched
     const playerUpdates=Object.values(playerMap).map(p=>updateDoc(doc(db,'players',p.firestoreId),{rating:p.rating,rd:p.rd,wins:p.wins||0,losses:p.losses||0,lastDecayAt:p.lastMatchAt||Date.now()}));
     await Promise.all([...playerUpdates,...matchUpdates]);
     alert('Match deleted and ratings recalculated from that point forward.');
