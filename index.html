@@ -1195,64 +1195,97 @@ window.adminRemoveMatch=async function(fid){
     await deleteDoc(doc(db,'matches',fid));
     const matchesBefore=allMatches.slice(0,deletedIdx);
     const matchesAfter=allMatches.slice(deletedIdx+1);
-    // Figure out which player IDs actually appear in matchesAfter — only those need rewriting.
-    // Players who only appear in matchesBefore (or not at all) must NOT be touched,
-    // otherwise we'd overwrite their legitimate RD with the seeded value of 120.
-    const affectedIds=new Set();
-    matchesAfter.forEach(m=>{affectedIds.add(m.p1id);affectedIds.add(m.p2id);});
-    // Always include the two players from the deleted match itself
-    affectedIds.add(deletedMatch.p1id);affectedIds.add(deletedMatch.p2id);
 
-    // Build playerMap only for affected players, seeding from actual Firestore data
-    // then replaying matchesBefore to get their pre-deletion-point state.
-    const playersSnap=await getDocs(collection(db,'players'));
-    const playerMap={};
-    playersSnap.docs.forEach(d=>{
-      if(!affectedIds.has(d.id))return; // skip unaffected players entirely
-      // Seed from Firestore data (preserves real RD for players with no matches at all)
-      // but we'll overwrite via replay below for players who do have matches
-      playerMap[d.id]={firestoreId:d.id,...d.data(),wins:0,losses:0,lastMatchAt:null};
-      // Reset rating/rd/wins/losses to baseline — replay will reconstruct correct values
-      playerMap[d.id].rating=1500;playerMap[d.id].rd=120;
-    });
+    // Only the two players in the deleted match are directly affected.
+    // We replay ONLY their matches in matchesAfter — all other players and matches are untouched.
+    const pid1=deletedMatch.p1id, pid2=deletedMatch.p2id;
 
-    // Replay matchesBefore to reconstruct each affected player's state just before the deleted match
-    for(const m of matchesBefore){
-      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      if(playerMap[m.p1id]){playerMap[m.p1id].rating=m.p1newRating;playerMap[m.p1id].rd=m.p1newRD;playerMap[m.p1id].wins=(playerMap[m.p1id].wins||0)+1;playerMap[m.p1id].lastMatchAt=ts;}
-      if(playerMap[m.p2id]){playerMap[m.p2id].rating=m.p2newRating;playerMap[m.p2id].rd=m.p2newRD;playerMap[m.p2id].losses=(playerMap[m.p2id].losses||0)+1;playerMap[m.p2id].lastMatchAt=ts;}
-    }
+    // Reconstruct each affected player's state from stored match history up to (not including) deleted match
+    const s1=playerStateFromHistory(matchesBefore,pid1);
+    const s2=playerStateFromHistory(matchesBefore,pid2);
 
     if(matchesAfter.length===0){
-      // No matches after — just rewind the two involved players, touch nobody else
-      const wState=playerStateFromHistory(matchesBefore,deletedMatch.p1id);
-      const lState=playerStateFromHistory(matchesBefore,deletedMatch.p2id);
+      // Nothing after — just rewind both players
       await Promise.all([
-        updateDoc(doc(db,'players',deletedMatch.p1id),{rating:wState.rating,rd:wState.rd,wins:wState.wins,losses:wState.losses,lastDecayAt:wState.lastMatchAt||Date.now()}),
-        updateDoc(doc(db,'players',deletedMatch.p2id),{rating:lState.rating,rd:lState.rd,wins:lState.wins,losses:lState.losses,lastDecayAt:lState.lastMatchAt||Date.now()}),
+        updateDoc(doc(db,'players',pid1),{rating:s1.rating,rd:s1.rd,wins:s1.wins,losses:s1.losses,lastDecayAt:s1.lastMatchAt||Date.now()}),
+        updateDoc(doc(db,'players',pid2),{rating:s2.rating,rd:s2.rd,wins:s2.wins,losses:s2.losses,lastDecayAt:s2.lastMatchAt||Date.now()}),
       ]);
       alert('Match deleted. Ratings rewound to previous state.');
       return;
     }
 
+    // Build a state map for just the two affected players
     const periodMs=decayMs();
+    const pmap={
+      [pid1]:{...s1,firestoreId:pid1},
+      [pid2]:{...s2,firestoreId:pid2},
+    };
+
+    // Walk matchesAfter in chronological order.
+    // - Matches involving pid1 or pid2: recalculate and rewrite.
+    // - Matches between two other players: read stored opponent ratings/RDs so we know
+    //   what pid1/pid2's opponent was rated at that moment (use stored values — those
+    //   players were unaffected so their stored match data is still correct).
     const matchUpdates=[];
+    const playerUpdates={};
+
     for(const m of matchesAfter){
+      const involvesP1=m.p1id===pid1||m.p2id===pid1;
+      const involvesP2=m.p1id===pid2||m.p2id===pid2;
+      if(!involvesP1&&!involvesP2)continue; // unrelated match — skip entirely
+
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      const w=playerMap[m.p1id],l=playerMap[m.p2id];
-      if(!w||!l)continue;
-      applyDecayToPlayer(w,ts,periodMs);applyDecayToPlayer(l,ts,periodMs);
-      const uw=g2Update(w,[{rating:l.rating,rd:l.rd,s:1}]);
-      const ul=g2Update(l,[{rating:w.rating,rd:w.rd,s:0}]);
-      const p1delta=Math.round((uw.rating-w.rating)*10)/10;
-      const p2delta=Math.round((ul.rating-l.rating)*10)/10;
-      playerMap[m.p1id].rating=uw.rating;playerMap[m.p1id].rd=uw.rd;playerMap[m.p1id].wins=(playerMap[m.p1id].wins||0)+1;playerMap[m.p1id].lastMatchAt=ts;
-      playerMap[m.p2id].rating=ul.rating;playerMap[m.p2id].rd=ul.rd;playerMap[m.p2id].losses=(playerMap[m.p2id].losses||0)+1;playerMap[m.p2id].lastMatchAt=ts;
-      matchUpdates.push(updateDoc(doc(db,'matches',m.firestoreId),{p1delta,p2delta,p1oldRating:w.rating,p1newRating:uw.rating,p2oldRating:l.rating,p2newRating:ul.rating,p1newRD:uw.rd,p2newRD:ul.rd}));
+      const isWinner1=m.p1id===pid1||m.p1id===pid2; // whichever of our two is p1 (p1 is always winner)
+      const ourId=involvesP1?pid1:pid2;
+      const oppId=isWinner1?m.p2id:m.p1id;
+      const ourState=pmap[ourId];
+
+      // Apply decay to our player since their last match
+      applyDecayToPlayer(ourState,ts,periodMs);
+
+      // Opponent's rating/RD: use stored pre-match values from the match record itself
+      // (they are unaffected, so their stored data is the ground truth)
+      const oppRating=isWinner1?m.p2oldRating:m.p1oldRating;
+      const oppRD=isWinner1?(m.p2newRD??120):(m.p1newRD??120); // their RD at that match (stored)
+
+      // Determine if our player won this match
+      const ourPlayerWon=(m.p1id===ourId); // p1 is always winner in stored data
+
+      const newState=g2Update(ourState,[{rating:oppRating,rd:oppRD,s:ourPlayerWon?1:0}]);
+      const oldRating=ourState.rating;
+      const delta=Math.round((newState.rating-oldRating)*10)/10;
+
+      // Update in-memory state
+      pmap[ourId].rating=newState.rating;
+      pmap[ourId].rd=newState.rd;
+      if(ourPlayerWon)pmap[ourId].wins=(pmap[ourId].wins||0)+1;
+      else pmap[ourId].losses=(pmap[ourId].losses||0)+1;
+      pmap[ourId].lastMatchAt=ts;
+
+      // Rewrite just the fields for our player in this match document
+      if(m.p1id===ourId){
+        matchUpdates.push(updateDoc(doc(db,'matches',m.firestoreId),{
+          p1delta:delta,p1oldRating:oldRating,p1newRating:newState.rating,p1newRD:newState.rd
+        }));
+      } else {
+        matchUpdates.push(updateDoc(doc(db,'matches',m.firestoreId),{
+          p2delta:delta,p2oldRating:oldRating,p2newRating:newState.rating,p2newRD:newState.rd
+        }));
+      }
+      playerUpdates[ourId]=pmap[ourId];
     }
-    // Only write back the affected players — everyone else is untouched
-    const playerUpdates=Object.values(playerMap).map(p=>updateDoc(doc(db,'players',p.firestoreId),{rating:p.rating,rd:p.rd,wins:p.wins||0,losses:p.losses||0,lastDecayAt:p.lastMatchAt||Date.now()}));
-    await Promise.all([...playerUpdates,...matchUpdates]);
+
+    // Write final player states for only the two affected players
+    const writes=Object.values(playerUpdates).map(p=>
+      updateDoc(doc(db,'players',p.firestoreId),{
+        rating:p.rating,rd:p.rd,wins:p.wins||0,losses:p.losses||0,lastDecayAt:p.lastMatchAt||Date.now()
+      })
+    );
+    // If one of the two players had no matches after either, still rewind them
+    if(!playerUpdates[pid1])writes.push(updateDoc(doc(db,'players',pid1),{rating:s1.rating,rd:s1.rd,wins:s1.wins,losses:s1.losses,lastDecayAt:s1.lastMatchAt||Date.now()}));
+    if(!playerUpdates[pid2])writes.push(updateDoc(doc(db,'players',pid2),{rating:s2.rating,rd:s2.rd,wins:s2.wins,losses:s2.losses,lastDecayAt:s2.lastMatchAt||Date.now()}));
+
+    await Promise.all([...writes,...matchUpdates]);
     alert('Match deleted and ratings recalculated from that point forward.');
   }catch(e){alert('Error: '+e.message);console.error(e);}
 };
