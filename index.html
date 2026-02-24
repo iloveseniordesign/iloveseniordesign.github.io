@@ -723,10 +723,21 @@ function computeDecay(p){
   return{newRD:Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10,newLast};
 }
 function applyDecayLocally(){
+  const ranked=players.filter(p=>p.rd<=100).sort((a,b)=>b.rating-a.rating);
+  const topBefore=ranked[0]||null;
   players.forEach(p=>{
     const r=computeDecay(p);if(!r)return;
     p.rd=r.newRD;p.lastDecayAt=r.newLast;
-    updateDoc(doc(db,'players',p.firestoreId),{rd:r.newRD,lastDecayAt:r.newLast}).catch(()=>{});
+    const upd={rd:r.newRD,lastDecayAt:r.newLast};
+    // If this player was #1 and just decayed above RD 100, end their streak
+    if(topBefore&&p.firestoreId===topBefore.firestoreId&&r.newRD>100&&p.no1Since){
+      const dur=Date.now()-(p.no1Since||Date.now());
+      const prev=p.longestNo1Ms||0;
+      upd.no1Since=null;
+      if(dur>prev)upd.longestNo1Ms=dur;
+      p.no1Since=null;if(dur>prev)p.longestNo1Ms=dur;
+    }
+    updateDoc(doc(db,'players',p.firestoreId),upd).catch(()=>{});
   });
 }
 function updateDecayStatus(){
@@ -808,7 +819,8 @@ function renderLeaderboard(){
     const seasons=p.seasons||[];
     const lastS=seasons.length?seasons[seasons.length-1]:null;
     const sBadge=lastS?(()=>{const rk=lastS.rank,cls=rk===1?'rank1':rk===2?'rank2':rk===3?'rank3':'rankN',emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';return`<span class="s-badge ${cls}" title="Last season: ${esc(lastS.seasonName||'Season '+lastS.seasonNum)}" style="font-size:.6rem;padding:.12rem .35rem">${emoji}${emoji?'':('#'+rk)}</span>`})():'';
-    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}</div></td><td><span class="rating-val">${Math.round(p.rating)}</span></td><td><span class="rd-val">±${Math.round(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
+    const no1Tag=i===0&&p.no1Since?`<span class="no1-timer" data-since="${p.no1Since}" style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--accent3);margin-left:.35rem;letter-spacing:.03em">👑 —</span>`:'';
+    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}${no1Tag}</div></td><td><span class="rating-val">${Math.round(p.rating)}</span></td><td><span class="rd-val">±${Math.round(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
   }).join('')+(sorted.length>vis.length?`<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
 }
 
@@ -853,7 +865,7 @@ function makeCard(p){
       <div class="pc-stat"><span class="pc-stat-l">Record</span><span class="pc-stat-v">${p.wins}W–${p.losses}L</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Win%</span><span class="pc-stat-v" style="color:${wc}">${wr}%</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Streak</span><span class="pc-stat-v" style="color:${sc}">${ls>0?ls+'W':'—'}</span></div>
-      <div class="pc-stat"><span class="pc-stat-l">Longest #1</span><span class="pc-stat-v" style="color:var(--accent3);font-size:.95rem">${fmtDur(la)}</span></div>
+      <div class="pc-stat"><span class="pc-stat-l">Longest #1</span><span class="pc-stat-v" style="color:var(--accent3);font-size:.95rem">${p.no1Since?`<span class="no1-timer" data-since="${p.no1Since}">👑 —</span>`:fmtDur(p.longestNo1Ms||la)}</span></div>
     </div>
     <div class="pc-foot"><span class="pc-hint">TAP TO VIEW PROFILE</span></div>
     ${histHtml}
@@ -956,6 +968,15 @@ function pStats(fid){
 }
 function toTs(m){return m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();}
 function fmtDur(ms){if(ms<=0)return'—';const d=Math.floor(ms/864e5),h=Math.floor((ms%864e5)/36e5);if(d>0)return d+'d '+h+'h';const m2=Math.floor((ms%36e5)/6e4);if(h>0)return h+'h '+m2+'m';return m2+'m';}
+function tickNo1Timers(){
+  const now=Date.now();
+  document.querySelectorAll('.no1-timer[data-since]').forEach(el=>{
+    const since=parseInt(el.dataset.since);
+    if(!since)return;
+    el.textContent='👑 '+fmtDur(now-since);
+  });
+}
+setInterval(tickNo1Timers,1000);
 
 // ── SEASON LOGIC ─────────────────────────────────────────────────────────────
 let seasonConfig={name:'',deadline:null,seasonNum:1};
@@ -1166,8 +1187,44 @@ window.submitMatch=async function(){
     const w=ws.data(),l=ls.data();
     const uw=g2Update(w,[{rating:l.rating,rd:l.rd,s:1}]),ul=g2Update(l,[{rating:w.rating,rd:w.rd,s:0}]);
     const now=Date.now();
-    tx.update(doc(db,'players',wid),{rating:uw.rating,rd:uw.rd,wins:w.wins+1});
-    tx.update(doc(db,'players',lid),{rating:ul.rating,rd:ul.rd,losses:l.losses+1});
+    // Determine current #1 before and after this match
+    const allSnap=await getDocs(query(collection(db,'players')));
+    const allP=allSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const ranked=p=>p.rd<=100;
+    const topBefore=allP.filter(ranked).sort((a,b)=>b.rating-a.rating)[0];
+    // Simulate post-match ratings to find new #1
+    const simP=allP.map(p=>{
+      if(p.id===wid)return{...p,rating:uw.rating,rd:uw.rd};
+      if(p.id===lid)return{...p,rating:ul.rating,rd:ul.rd};
+      return p;
+    });
+    const topAfter=simP.filter(ranked).sort((a,b)=>b.rating-a.rating)[0];
+    const wUpdate={rating:uw.rating,rd:uw.rd,wins:w.wins+1};
+    const lUpdate={rating:ul.rating,rd:ul.rd,losses:l.losses+1};
+    // If #1 changed, finalize old #1 streak and start new one
+    if(topBefore?.id!==topAfter?.id){
+      if(topBefore){
+        const oldTop=allP.find(p=>p.id===topBefore.id);
+        if(oldTop?.no1Since){
+          const dur=now-(oldTop.no1Since||now);
+          const prev=oldTop.longestNo1Ms||0;
+          const upd={no1Since:null};
+          if(dur>prev)upd.longestNo1Ms=dur;
+          if(oldTop.id===wid)Object.assign(wUpdate,upd);
+          else if(oldTop.id===lid)Object.assign(lUpdate,upd);
+          else await tx.update(doc(db,'players',oldTop.id),upd);
+        }
+      }
+      if(topAfter){
+        const newTopData=allP.find(p=>p.id===topAfter.id);
+        const no1Since=newTopData?.no1Since||now;
+        if(topAfter.id===wid)wUpdate.no1Since=no1Since;
+        else if(topAfter.id===lid)lUpdate.no1Since=no1Since;
+        else await tx.update(doc(db,'players',topAfter.id),{no1Since});
+      }
+    }
+    tx.update(doc(db,'players',wid),wUpdate);
+    tx.update(doc(db,'players',lid),lUpdate);
     const sc=document.getElementById('match-score').value.trim();
     tx.set(doc(collection(db,'matches')),{winnerId:wid,loserId:lid,winnerName:w.name,loserName:l.name,p1id:wid,p2id:lid,p1name:w.name,p2name:l.name,score:1,matchScore:sc||null,p1delta:Math.round((uw.rating-w.rating)*10)/10,p2delta:Math.round((ul.rating-l.rating)*10)/10,p1newRD:uw.rd,p2newRD:ul.rd,p1oldRating:w.rating,p1newRating:uw.rating,p2oldRating:l.rating,p2newRating:ul.rating,date:serverTimestamp()});
   });document.getElementById('match-score').value='';const wn=players.find(p=>p.firestoreId===wid);showMsg('match-msg',(wn?.name||'Winner')+' wins!');}
@@ -1390,6 +1447,73 @@ window.repairAllRatings=async function(){
       }));
     }
 
+    // Also recalculate longestNo1Ms and no1Since for each player from match history
+    // Replay all matches in order tracking who was #1 with RD<=100
+    const repairRs={},repairRds={};
+    players.forEach(p=>{repairRs[p.firestoreId]=1500;repairRds[p.firestoreId]=350;});
+    // Seed from first appearance
+    const repairSeen=new Set();
+    for(const m of allMatches){
+      if(!repairSeen.has(m.p1id)){repairRs[m.p1id]=m.p1oldRating;repairRds[m.p1id]=m.p1newRD??120;repairSeen.add(m.p1id);}
+      if(!repairSeen.has(m.p2id)){repairRs[m.p2id]=m.p2oldRating;repairRds[m.p2id]=m.p2newRD??120;repairSeen.add(m.p2id);}
+    }
+    const repairTop=()=>{let best=null,bestR=-Infinity;for(const[id,r] of Object.entries(repairRs)){if(repairRds[id]<=100&&r>bestR){bestR=r;best=id;}}return best;};
+    const no1Starts={},longestNo1={};
+    let lastRepairTs=null;
+    const repairPeriodMs=decayMs();
+    for(const m of allMatches){
+      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+      // Apply decay between matches
+      if(lastRepairTs!==null&&repairPeriodMs>0){
+        const periods=Math.floor((ts-lastRepairTs)/repairPeriodMs);
+        if(periods>0){
+          const wasTop=repairTop();
+          for(const id of Object.keys(repairRds)){
+            let phi=repairRds[id]/173.7178;const phiMax=RD_MAX/173.7178;
+            for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+            repairRds[id]=Math.min(phi*173.7178,RD_MAX);
+          }
+          const nowTop=repairTop();
+          if(wasTop&&nowTop!==wasTop){
+            if(no1Starts[wasTop]!=null){const dur=lastRepairTs+periods*repairPeriodMs-no1Starts[wasTop];longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,dur);delete no1Starts[wasTop];}
+            if(nowTop&&no1Starts[nowTop]==null)no1Starts[nowTop]=lastRepairTs+periods*repairPeriodMs;
+          }
+        }
+      }
+      const pt=repairTop();
+      repairRs[m.p1id]=m.p1newRating;repairRs[m.p2id]=m.p2newRating;
+      repairRds[m.p1id]=m.p1newRD??repairRds[m.p1id];repairRds[m.p2id]=m.p2newRD??repairRds[m.p2id];
+      const nt=repairTop();
+      if(pt!==nt){
+        if(pt&&no1Starts[pt]!=null){const dur=ts-no1Starts[pt];longestNo1[pt]=Math.max(longestNo1[pt]||0,dur);delete no1Starts[pt];}
+        if(nt&&no1Starts[nt]==null)no1Starts[nt]=ts;
+      }
+      lastRepairTs=ts;
+    }
+    // Finalize anyone still #1 now
+    const currentTop=repairTop();
+    for(const[pid,since] of Object.entries(no1Starts)){
+      if(pid===currentTop){
+        // Still #1 — keep no1Since, don't finalize longestNo1 yet (it's still counting)
+      } else {
+        const dur=now-(since||now);longestNo1[pid]=Math.max(longestNo1[pid]||0,dur);
+      }
+    }
+    // Add no1Since and longestNo1Ms to the updates
+    for(const p of players){
+      const isCurrentTop=p.firestoreId===currentTop&&repairRds[p.firestoreId]<=100;
+      const no1Since=isCurrentTop?(no1Starts[p.firestoreId]||now):null;
+      const longestMs=longestNo1[p.firestoreId]||0;
+      const existing=updates.find(u=>u._key?.path?.segments?.join('/')?.includes(p.firestoreId));
+      // Just push a separate update for no1 fields — simpler than merging
+      if(no1Since!==undefined||longestMs>0){
+        updates.push(updateDoc(doc(db,'players',p.firestoreId),{
+          ...(no1Since!==null?{no1Since}:{no1Since:null}),
+          ...(longestMs>0?{longestNo1Ms:longestMs}:{})
+        }));
+      }
+    }
+
     await Promise.all(updates);
     showMsg('repair-msg',`Repaired ${updates.length} player(s) from match history.`);
   }catch(e){
@@ -1576,7 +1700,7 @@ window.openProfile=async function(fid){
     <div class="m-stat"><span class="m-stat-l">Record</span><span class="m-stat-v neutral">${p.wins}W–${p.losses}L</span></div>
     <div class="m-stat"><span class="m-stat-l">Win%</span><span class="m-stat-v ${wc}">${wr}%</span></div>
     <div class="m-stat"><span class="m-stat-l">Streak</span><span class="m-stat-v ${ls>=5?'green':ls>=3?'':'neutral'}">${ls>0?ls+'W':'—'}</span></div>
-    <div class="m-stat"><span class="m-stat-l">Longest #1</span><span class="m-stat-v" style="color:var(--accent3);font-size:1rem">${fmtDur(la)}</span></div>`;
+    <div class="m-stat"><span class="m-stat-l">Longest #1</span><span class="m-stat-v" style="color:var(--accent3);font-size:1rem">${p.no1Since?`<span class="no1-timer counting" data-since="${p.no1Since}">👑 —</span>`:fmtDur(p.longestNo1Ms||la)}</span></div>`;
 
   const ids=new Set(players.map(x=>x.firestoreId));
   const pm=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)&&(m.p1id===fid||m.p2id===fid)).sort((a,b)=>toTs(a)-toTs(b));
