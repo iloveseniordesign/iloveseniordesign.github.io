@@ -300,7 +300,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
   .players-sidebar{width:100%;max-width:100%;}
   .form-card{width:100%;max-width:100%;box-sizing:border-box;}
 }
-.match-meta-col{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);line-height:1.6;text-align:right;}
+.match-meta-col{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -1264,9 +1264,9 @@ window.renderHistory=function(){
     const d1=(m.p1delta>=0?'+':'')+m.p1delta,d2=(m.p2delta>=0?'+':'')+m.p2delta;
     return`<div class="match-row">
       <div class="match-player"><span class="name">${esc(m.p1name)}</span><span class="delta ${m.p1delta>=0?'pos':'neg'}">${d1} (${Math.round(m.p1oldRating)}→${Math.round(m.p1newRating)})</span><span class="rdi">RD:±${Math.round(m.p1newRD)}</span></div>
-      <div class="match-mid"><div class="match-result"><span class="ws">WIN</span>${m.matchScore?`<span class="match-score-lbl">${esc(m.matchScore)}</span>`:'<span style="font-size:.8rem;color:var(--muted)">vs</span>'}<span class="ls">LOSS</span></div><div class="match-date-lbl">${ds} ${ti}</div></div>
+      <div class="match-mid"><div class="match-result"><span class="ws">WIN</span>${m.matchScore?`<span class="match-score-lbl">${esc(m.matchScore)}</span>`:'<span style="font-size:.8rem;color:var(--muted)">vs</span>'}<span class="ls">LOSS</span></div></div>
       <div class="match-player" style="text-align:right"><span class="name">${esc(m.p2name)}</span><span class="delta ${m.p2delta>=0?'pos':'neg'}">${d2} (${Math.round(m.p2oldRating)}→${Math.round(m.p2newRating)})</span><span class="rdi">RD:±${Math.round(m.p2newRD)}</span></div>
-      <div class="match-meta-col">${ds}<br>${ti}${m.matchScore?'<br>'+esc(m.matchScore):''}</div>
+      <div class="match-meta-col">${ds} · ${ti}</div>
     </div>`;
   }).join('');
 };
