@@ -695,12 +695,32 @@ function decayMs(){
   if(u==='hours')return a*36e5;
   return a*864e5;
 }
+// Global decay epoch: periods are aligned to midnight Jan 1 2025 UTC.
+// Every player decays on the same universal ticks regardless of when they last played.
+// e.g. with 4hr periods: ticks at 12am, 4am, 8am, 12pm, 4pm, 8pm every day.
+const DECAY_EPOCH=new Date('2025-01-01T00:00:00Z').getTime();
+
+function currentDecayPeriod(ms){
+  // Which global tick number are we at right now?
+  return Math.floor((Date.now()-DECAY_EPOCH)/ms);
+}
+
 function computeDecay(p){
-  const now=Date.now(),last=p.lastDecayAt||now,ms=decayMs(),per=Math.floor((now-last)/ms);
+  const ms=decayMs();
+  // Decay is purely global-clock based — matches don't affect the timer.
+  // basePeriod = which tick the player was last processed at (stored in lastDecayAt)
+  const lastProcessed=p.lastDecayAt||DECAY_EPOCH;
+  const basePeriod=Math.floor((lastProcessed-DECAY_EPOCH)/ms);
+  const nowPeriod=currentDecayPeriod(ms);
+  const per=nowPeriod-basePeriod;
   if(per<=0)return null;
+
   let phi=p.rd/173.7178,phiMax=RD_MAX/173.7178;
   for(let i=0;i<per;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-  return{newRD:Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10,newLast:last+per*ms};
+
+  // newLast = timestamp of the most recent completed global tick
+  const newLast=DECAY_EPOCH+nowPeriod*ms;
+  return{newRD:Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10,newLast};
 }
 function applyDecayLocally(){
   players.forEach(p=>{
@@ -711,13 +731,16 @@ function applyDecayLocally(){
 }
 function updateDecayStatus(){
   const el=document.getElementById('decay-status');
-  if(!el||!players.length)return;
+  if(!el)return;
   const ms=decayMs(),now=Date.now();
-  const next=Math.min(...players.map(p=>(p.lastDecayAt||now)+ms-now));
-  const a=document.getElementById('decay-amount').value||'7';
-  const u=document.getElementById('decay-unit').value||'days';
+  const a=document.getElementById('decay-amount').value||'4';
+  const u=document.getElementById('decay-unit').value||'hours';
   const lbl=a+u.charAt(0).toUpperCase();
-  if(next>0){const h=Math.floor(next/36e5),m=Math.floor((next%36e5)/6e4),s=Math.floor((next%6e4)/1e3);el.textContent='DECAY·'+lbl+'·NEXT '+(h>0?h+'h'+m+'m':m+'m'+s+'s');}
+  // Next global tick aligned to epoch
+  const nowPeriod=Math.floor((now-DECAY_EPOCH)/ms);
+  const nextTick=DECAY_EPOCH+(nowPeriod+1)*ms;
+  const diff=nextTick-now;
+  if(diff>0){const h=Math.floor(diff/36e5),m=Math.floor((diff%36e5)/6e4),s=Math.floor((diff%6e4)/1e3);el.textContent='DECAY·'+lbl+'·NEXT '+(h>0?h+'h'+m+'m':m+'m'+s+'s');}
   else el.textContent='DECAY·'+lbl;
 }
 
@@ -873,11 +896,12 @@ function pStats(fid){
     // Track both rating and RD per player so we can check leaderboard eligibility (RD<=100)
     const rs={},rds={};
     players.forEach(p=>{rs[p.firestoreId]=1500;rds[p.firestoreId]=350;}); // 350=unranked default before first match
-    // Seed from first match each player appears in
+    // Seed everyone at baseline before any matches — replay will build up correct values
+    // Don't seed from p1newRD of first match as those stored values may be stale
     const seen=new Set();
     all.forEach(m=>{
-      if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;rds[m.p1id]=m.p1newRD??120;seen.add(m.p1id);}
-      if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;rds[m.p2id]=m.p2newRD??120;seen.add(m.p2id);}
+      if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;seen.add(m.p1id);}
+      if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;seen.add(m.p2id);}
     });
     const periodMs=decayMs();
     // Returns the #1 ranked player among those with RD<=100, or null if nobody qualifies
@@ -911,15 +935,21 @@ function pStats(fid){
       }
       const pt=top();
       rs[m.p1id]=m.p1newRating;rs[m.p2id]=m.p2newRating;
-      rds[m.p1id]=m.p1newRD??rds[m.p1id];rds[m.p2id]=m.p2newRD??rds[m.p2id];
+      // Use stored newRD from match, falling back to current player doc RD as ground truth
+      const p1LiveRd=players.find(x=>x.firestoreId===m.p1id)?.rd;
+      const p2LiveRd=players.find(x=>x.firestoreId===m.p2id)?.rd;
+      rds[m.p1id]=m.p1newRD??p1LiveRd??rds[m.p1id];
+      rds[m.p2id]=m.p2newRD??p2LiveRd??rds[m.p2id];
       const nt=top();
       if(pt===fid&&nt!==fid){if(a1!==null){la=Math.max(la,ts-a1);a1=null;}}
       else if(pt!==fid&&nt===fid)a1=ts;
       lastTs=ts;
     });
     // If still #1 now (with current live RD after live decay)
-    const liveRdOk=rds[fid]<=100;
-    if(top()===fid&&liveRdOk&&a1!==null)la=Math.max(la,Date.now()-a1);
+    // Use the live player doc RD as the definitive current value (post-repair)
+    const livePlayer=players.find(x=>x.firestoreId===fid);
+    const liveRd=livePlayer?.rd??rds[fid];
+    if(top()===fid&&liveRd<=100&&a1!==null)la=Math.max(la,Date.now()-a1);
     else if(a1!==null){la=Math.max(la,0);} // streak ended (RD decay or displaced), don't extend
   }
   return{ls,la};
@@ -1136,8 +1166,8 @@ window.submitMatch=async function(){
     const w=ws.data(),l=ls.data();
     const uw=g2Update(w,[{rating:l.rating,rd:l.rd,s:1}]),ul=g2Update(l,[{rating:w.rating,rd:w.rd,s:0}]);
     const now=Date.now();
-    tx.update(doc(db,'players',wid),{rating:uw.rating,rd:uw.rd,wins:w.wins+1,lastDecayAt:now});
-    tx.update(doc(db,'players',lid),{rating:ul.rating,rd:ul.rd,losses:l.losses+1,lastDecayAt:now});
+    tx.update(doc(db,'players',wid),{rating:uw.rating,rd:uw.rd,wins:w.wins+1});
+    tx.update(doc(db,'players',lid),{rating:ul.rating,rd:ul.rd,losses:l.losses+1});
     const sc=document.getElementById('match-score').value.trim();
     tx.set(doc(collection(db,'matches')),{winnerId:wid,loserId:lid,winnerName:w.name,loserName:l.name,p1id:wid,p2id:lid,p1name:w.name,p2name:l.name,score:1,matchScore:sc||null,p1delta:Math.round((uw.rating-w.rating)*10)/10,p2delta:Math.round((ul.rating-l.rating)*10)/10,p1newRD:uw.rd,p2newRD:ul.rd,p1oldRating:w.rating,p1newRating:uw.rating,p2oldRating:l.rating,p2newRating:ul.rating,date:serverTimestamp()});
   });document.getElementById('match-score').value='';const wn=players.find(p=>p.firestoreId===wid);showMsg('match-msg',(wn?.name||'Winner')+' wins!');}
