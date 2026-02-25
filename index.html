@@ -267,6 +267,9 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
   margin-bottom:1.1rem;text-align:center;letter-spacing:.02em;line-height:1.6;opacity:.7;}
 .lb-quote .qa{color:var(--muted);font-style:normal;opacity:.8;}
 
+
+/* BRACKETS */
+.bracket-match-player:hover{background:rgba(229,178,93,.07)!important;}
 /* SCROLLBARS */
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
@@ -334,7 +337,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
   <button onclick="showPanel('match',this)">Submit Match</button>
   <button onclick="showPanel('history',this)">Match History</button>
   <button onclick="showPanel('rules',this)">Rules</button>
-  <button onclick="showPanel('pong',this)">Pong</button>
+  <button onclick="showPanel('brackets',this)">Brackets</button>
   <button id="admin-tab-btn" class="admin-tab" onclick="showPanel('admin',this)" style="display:none">★ Admin</button>
 </nav>
 
@@ -476,6 +479,34 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
         <div id="admin-players-list"><div class="loading">Loading</div></div>
       </div>
 
+
+      <div class="admin-section">
+        <div class="admin-stitle">Match Result Simulator</div>
+        <div class="form-card" style="border-color:rgba(201,160,220,.3);max-width:560px">
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Simulate Glicko-2 match outcomes without affecting real data. Enter ratings and optional RD/volatility for two hypothetical players.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.1rem">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--admin);margin-bottom:.5rem">Player A</div>
+              <div class="field" style="margin-bottom:.5rem"><label>Rating</label><input type="number" id="sim-a-rating" value="1500" step="1"></div>
+              <div class="field" style="margin-bottom:.5rem"><label>RD <span style="color:var(--muted);font-size:.55rem">(default 120)</span></label><input type="number" id="sim-a-rd" placeholder="120" step="0.1" min="30" max="200"></div>
+              <div class="field" style="margin-bottom:0"><label>Volatility σ <span style="color:var(--muted);font-size:.55rem">(default 0.06)</span></label><input type="number" id="sim-a-sigma" placeholder="0.06" step="0.001" min="0.01" max="0.30"></div>
+            </div>
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--admin);margin-bottom:.5rem">Player B</div>
+              <div class="field" style="margin-bottom:.5rem"><label>Rating</label><input type="number" id="sim-b-rating" value="1500" step="1"></div>
+              <div class="field" style="margin-bottom:.5rem"><label>RD <span style="color:var(--muted);font-size:.55rem">(default 120)</span></label><input type="number" id="sim-b-rd" placeholder="120" step="0.1" min="30" max="200"></div>
+              <div class="field" style="margin-bottom:0"><label>Volatility σ <span style="color:var(--muted);font-size:.55rem">(default 0.06)</span></label><input type="number" id="sim-b-sigma" placeholder="0.06" step="0.001" min="0.01" max="0.30"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">
+            <button class="btn-admin" onclick="simResult('A')" style="font-size:.68rem;padding:.65rem 1.2rem">▶ A Wins</button>
+            <button class="btn-admin" onclick="simResult('B')" style="font-size:.68rem;padding:.65rem 1.2rem">▶ B Wins</button>
+            <button class="btn-ghost" onclick="clearSim()" style="font-size:.62rem;padding:.55rem .9rem">Clear</button>
+          </div>
+          <div id="sim-result" style="display:none;margin-top:1rem;background:rgba(0,0,0,.25);border:1px solid var(--border);padding:.85rem 1rem;font-family:'DM Mono',monospace;font-size:.65rem;line-height:2;"></div>
+        </div>
+      </div>
+
       <div class="admin-section">
         <div class="admin-stitle">Match Log (Delete &amp; Recalculate)</div>
         <p style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-bottom:.75rem;line-height:1.5">Deleting a match will recalculate all ratings, RD, and volatility from that point forward, including time-based decay.</p>
@@ -485,26 +516,14 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
     </div>
   </div>
 
-  <!-- PONG -->
-  <div id="panel-pong" class="panel">
-    <div style="display:flex;flex-direction:column;align-items:center;gap:.75rem;padding:.5rem 0">
-      <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Every point scored = faster ball · Mouse / ↑↓ arrows / touch to move</div>
-      <div style="position:relative;display:inline-block">
-        <canvas id="pong-canvas" width="600" height="400" style="display:block;border:1px solid var(--border);background:#0d080b;max-width:100%;touch-action:none;"></canvas>
-        <div id="pong-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,8,11,.85)">
-          <div id="pong-overlay-title" style="font-family:'Bebas Neue',sans-serif;font-size:2.8rem;color:var(--accent);letter-spacing:.1em">PONG</div>
-          <div id="pong-overlay-sub" style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-top:.25rem;letter-spacing:.08em;text-align:center;padding:0 1rem">Click or tap to start</div>
-          <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);margin-top:.4rem;letter-spacing:.06em;text-align:center;line-height:1.8">
-            🖱 Mouse · ↑↓ Arrow keys · W/S keys<br>📱 Touch &amp; drag on mobile
-          </div>
-          <button id="pong-start-btn" onclick="startPong()" style="margin-top:1.2rem;background:var(--accent);color:#1e1018;border:none;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;padding:.65rem 1.6rem;cursor:pointer;">▶ START</button>
-        </div>
+  <!-- BRACKETS -->
+  <div id="panel-brackets" class="panel">
+    <div style="max-width:960px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.08em;color:var(--text)">Tournament Brackets</div>
+        <button class="btn" onclick="openNewBracketModal()">+ New Bracket</button>
       </div>
-      <div style="display:flex;gap:2rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);letter-spacing:.07em">
-        <span>YOU <span id="pong-score-player" style="color:var(--accent);font-size:1.1rem;font-family:'Bebas Neue',sans-serif">0</span></span>
-        <span>CPU <span id="pong-score-cpu" style="color:var(--loss);font-size:1.1rem;font-family:'Bebas Neue',sans-serif">0</span></span>
-        <span>SPEED <span id="pong-speed-display" style="color:var(--win);font-size:1.1rem;font-family:'Bebas Neue',sans-serif">1×</span></span>
-      </div>
+      <div id="brackets-list"><div class="empty">No brackets yet. Create one to get started.</div></div>
     </div>
   </div>
 </main>
@@ -571,6 +590,30 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       </div>
       <div class="msg" id="crop-msg" style="margin-top:.65rem"></div>
     </div>
+  </div>
+</div>
+
+<!-- NEW BRACKET MODAL -->
+<div class="am-overlay" id="new-bracket-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="am-box" style="max-width:420px">
+    <h2>New Tournament Bracket</h2>
+    <div class="field"><label>Tournament Name</label><input type="text" id="bracket-name-input" placeholder="e.g. Office Slam 2025"></div>
+    <div class="field">
+      <label>Format</label>
+      <select id="bracket-format">
+        <option value="single">Single Elimination</option>
+        <option value="double">Double Elimination</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Select Players</label>
+      <div id="bracket-player-checkboxes" style="max-height:180px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);padding:.5rem .75rem;display:flex;flex-direction:column;gap:.35rem;"></div>
+    </div>
+    <div style="display:flex;gap:.65rem;margin-top:.5rem">
+      <button class="btn" onclick="createBracket()">Create Bracket</button>
+      <button class="btn-ghost" onclick="document.getElementById('new-bracket-overlay').classList.remove('open')">Cancel</button>
+    </div>
+    <div class="msg" id="bracket-create-msg" style="margin-top:.65rem"></div>
   </div>
 </div>
 
@@ -1933,9 +1976,8 @@ function drawChart(points){
   newOuter.addEventListener('mousemove',onMove);newOuter.addEventListener('mouseleave',onLeave);newOuter.addEventListener('touchmove',onMove,{passive:true});newOuter.addEventListener('touchend',onLeave);
 }
 
-// ── PONG ─────────────────────────────────────────────────────────────────────
-let pongRaf=null,pongRunning=false,pongInited=false;
-const PONG={W:600,H:400,PAD_W:10,PAD_H:70,BALL:8,BASE_SPEED:5,state:null};
+// ── BRACKETS ─────────────────────────────────────────────────────────────────
+let brackets=[]; // {id, name, format, players, rounds, createdAt}
 
 window.showPanel=function(id,btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -1945,113 +1987,237 @@ window.showPanel=function(id,btn){
   if(id==='players')renderPlayersList();
   if(id==='history')renderHistory();
   if(id==='admin')renderAdminPanel();
-  if(id!=='pong'&&pongRunning){pongRunning=false;if(pongRaf)cancelAnimationFrame(pongRaf);}
-  if(id==='pong')initPong();
+  if(id==='brackets')renderBrackets();
 };
 
-function initPong(){
-  if(pongInited)return;
-  pongInited=true;
-  const canvas=document.getElementById('pong-canvas');
-  canvas.addEventListener('mousemove',e=>{
-    if(!pongRunning||!PONG.state)return;
-    const rect=canvas.getBoundingClientRect();
-    const y=(e.clientY-rect.top)*(PONG.H/rect.height);
-    PONG.state.playerY=Math.max(PONG.PAD_H/2,Math.min(PONG.H-PONG.PAD_H/2,y));
-  });
-  canvas.addEventListener('touchmove',e=>{
-    if(!pongRunning||!PONG.state)return;
-    e.preventDefault();
-    const rect=canvas.getBoundingClientRect();
-    const y=(e.touches[0].clientY-rect.top)*(PONG.H/rect.height);
-    PONG.state.playerY=Math.max(PONG.PAD_H/2,Math.min(PONG.H-PONG.PAD_H/2,y));
-  },{passive:false});
-  const keysHeld=new Set();
-  window.addEventListener('keydown',e=>{
-    if(pongRunning&&(e.key==='ArrowUp'||e.key==='ArrowDown'))e.preventDefault();
-    keysHeld.add(e.key);
-  });
-  window.addEventListener('keyup',e=>keysHeld.delete(e.key));
-  setInterval(()=>{
-    if(!pongRunning||!PONG.state)return;
-    const step=Math.max(14,PONG.state.speed*1.6);
-    if(keysHeld.has('ArrowUp')||keysHeld.has('w')||keysHeld.has('W'))
-      PONG.state.playerY=Math.max(PONG.PAD_H/2,PONG.state.playerY-step);
-    if(keysHeld.has('ArrowDown')||keysHeld.has('s')||keysHeld.has('S'))
-      PONG.state.playerY=Math.min(PONG.H-PONG.PAD_H/2,PONG.state.playerY+step);
-  },16);
-  document.getElementById('pong-overlay').addEventListener('click',()=>{if(!pongRunning)startPong();});
+function renderBrackets(){
+  const el=document.getElementById('brackets-list');
+  if(!el)return;
+  if(!brackets.length){el.innerHTML='<div class="empty">No brackets yet. Create one to get started.</div>';return;}
+  el.innerHTML=brackets.map((b,bi)=>`
+    <div style="background:var(--surface);border:1px solid var(--border);padding:1rem;margin-bottom:.85rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+        <div>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1.15rem;letter-spacing:.06em;color:var(--text)">${esc(b.name)}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);margin-left:.6rem;text-transform:uppercase;letter-spacing:.07em">${b.format==='double'?'Double Elim':'Single Elim'} · ${b.players.length} players</span>
+        </div>
+        <button class="btn-danger" style="font-size:.55rem" onclick="deleteBracket(${bi})">Delete</button>
+      </div>
+      ${renderBracketGrid(b,bi)}
+    </div>`).join('');
 }
 
-function resetBall(dir=1){
-  const angle=(Math.random()*60-30)*(Math.PI/180);
-  const spd=PONG.state.speed;
-  return{x:PONG.W/2,y:PONG.H/2,vx:Math.cos(angle)*spd*dir,vy:Math.sin(angle)*spd};
+function renderBracketGrid(b,bi){
+  if(!b.rounds||!b.rounds.length)return'<div class="empty" style="padding:1rem">No rounds generated.</div>';
+  let html='<div style="overflow-x:auto"><div style="display:flex;gap:1.5rem;min-width:max-content;padding-bottom:.5rem">';
+  b.rounds.forEach((round,ri)=>{
+    const isWinners = round.type!=='losers'&&round.type!=='grand';
+    const roundLabel = round.type==='losers'?`Losers R${round.label||ri+1}`:round.type==='grand'?'Grand Final':`Round ${ri+1}`;
+    html+=`<div style="display:flex;flex-direction:column;gap:.5rem;min-width:160px">`;
+    html+=`<div style="font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.25rem;padding-bottom:.25rem;border-bottom:1px solid var(--border)">${roundLabel}</div>`;
+    round.matches.forEach((m,mi)=>{
+      const p1=m.p1||'TBD', p2=m.p2||'TBD';
+      const w=m.winner;
+      html+=`<div style="background:var(--bg);border:1px solid var(--border);overflow:hidden">
+        <div onclick="setBracketWinner(${bi},${ri},${mi},0)" style="padding:.38rem .6rem;cursor:pointer;font-size:.78rem;font-weight:600;border-bottom:1px solid var(--border);transition:background .15s;${w===0?'background:rgba(126,200,160,.12);color:var(--win)':''}${p1==='TBD'?';opacity:.45;cursor:default':''}">${esc(p1)}${w===0?' ✓':''}</div>
+        <div onclick="setBracketWinner(${bi},${ri},${mi},1)" style="padding:.38rem .6rem;cursor:pointer;font-size:.78rem;font-weight:600;transition:background .15s;${w===1?'background:rgba(126,200,160,.12);color:var(--win)':''}${p2==='TBD'?';opacity:.45;cursor:cursor:default':''}">${esc(p2)}${w===1?' ✓':''}</div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  html+='</div></div>';
+  return html;
 }
 
-window.startPong=function(){
-  if(pongRaf)cancelAnimationFrame(pongRaf);
-  PONG.state={playerY:PONG.H/2,cpuY:PONG.H/2,scorePlayer:0,scoreCpu:0,speed:PONG.BASE_SPEED,totalPoints:0,flash:0};
-  Object.assign(PONG.state,{ball:resetBall(1)});
-  document.getElementById('pong-overlay').style.display='none';
-  pongRunning=true;
-  pongLoop();
+window.setBracketWinner=function(bi,ri,mi,playerIdx){
+  const b=brackets[bi];
+  const match=b.rounds[ri].matches[mi];
+  if(!match.p1||!match.p2||match.p1==='TBD'||match.p2==='TBD')return;
+  if(match.winner===playerIdx){match.winner=null;}else{match.winner=playerIdx;}
+  propagateBracket(b);
+  saveBracketsToStorage();
+  renderBrackets();
 };
 
-function pongLoop(){
-  const canvas=document.getElementById('pong-canvas');
-  const ctx=canvas.getContext('2d');
-  const s=PONG.state;
-  const{W,H,PAD_W,PAD_H,BALL}=PONG;
-  const b=s.ball;
-  const cpuSpeed=3+s.speed*0.35;
-  if(b.x>W*0.5){
-    if(s.cpuY<b.y-8)s.cpuY=Math.min(s.cpuY+cpuSpeed,H-PAD_H/2);
-    else if(s.cpuY>b.y+8)s.cpuY=Math.max(s.cpuY-cpuSpeed,PAD_H/2);
+function propagateBracket(b){
+  if(b.format==='single'){
+    for(let ri=0;ri<b.rounds.length-1;ri++){
+      const nextRound=b.rounds[ri+1];
+      b.rounds[ri].matches.forEach((m,mi)=>{
+        if(m.winner!=null){
+          const winner=m.winner===0?m.p1:m.p2;
+          const slot=Math.floor(mi/2);
+          const side=mi%2;
+          if(nextRound.matches[slot]){
+            if(side===0)nextRound.matches[slot].p1=winner;
+            else nextRound.matches[slot].p2=winner;
+          }
+        }
+      });
+    }
+  } else {
+    // Double elim: propagate winners bracket, losers bracket winners advance to grand final
+    // Simple propagation for winners rounds
+    const wRounds=b.rounds.filter(r=>r.type==='winners');
+    for(let ri=0;ri<wRounds.length-1;ri++){
+      const nextW=wRounds[ri+1];
+      wRounds[ri].matches.forEach((m,mi)=>{
+        if(m.winner!=null){
+          const winner=m.winner===0?m.p1:m.p2;
+          const slot=Math.floor(mi/2);
+          if(nextW.matches[slot]){
+            if(mi%2===0)nextW.matches[slot].p1=winner;
+            else nextW.matches[slot].p2=winner;
+          }
+        }
+      });
+    }
+    // Losers bracket propagation
+    const lRounds=b.rounds.filter(r=>r.type==='losers');
+    for(let ri=0;ri<lRounds.length-1;ri++){
+      const nextL=lRounds[ri+1];
+      lRounds[ri].matches.forEach((m,mi)=>{
+        if(m.winner!=null){
+          const winner=m.winner===0?m.p1:m.p2;
+          const slot=Math.floor(mi/2);
+          if(nextL.matches[slot]){
+            if(mi%2===0)nextL.matches[slot].p1=winner;
+            else nextL.matches[slot].p2=winner;
+          }
+        }
+      });
+    }
+    // Grand final seeds
+    const grand=b.rounds.find(r=>r.type==='grand');
+    if(grand&&grand.matches[0]){
+      const lastW=wRounds[wRounds.length-1];
+      const lastL=lRounds[lRounds.length-1];
+      if(lastW&&lastW.matches[0]&&lastW.matches[0].winner!=null)
+        grand.matches[0].p1=lastW.matches[0].winner===0?lastW.matches[0].p1:lastW.matches[0].p2;
+      if(lastL&&lastL.matches[0]&&lastL.matches[0].winner!=null)
+        grand.matches[0].p2=lastL.matches[0].winner===0?lastL.matches[0].p1:lastL.matches[0].p2;
+    }
   }
-  b.x+=b.vx;b.y+=b.vy;
-  if(b.y-BALL<0){b.y=BALL;b.vy=Math.abs(b.vy);}
-  if(b.y+BALL>H){b.y=H-BALL;b.vy=-Math.abs(b.vy);}
-  const px=PAD_W+4;
-  if(b.vx<0&&b.x-BALL<=px+PAD_W&&b.x+BALL>=px&&b.y>=s.playerY-PAD_H/2&&b.y<=s.playerY+PAD_H/2){
-    b.x=px+PAD_W+BALL;
-    const rel=(b.y-s.playerY)/(PAD_H/2);
-    const angle=rel*65*(Math.PI/180);
-    b.vx=Math.cos(angle)*s.speed;b.vy=Math.sin(angle)*s.speed;
-    s.totalPoints++;s.scorePlayer++;s.speed+=0.4;s.flash=8;
-    if(s.speed>28)s.speed=28;updatePongHUD(s);
-  }
-  const cx=W-PAD_W-4;
-  if(b.vx>0&&b.x+BALL>=cx&&b.x-BALL<=cx+PAD_W&&b.y>=s.cpuY-PAD_H/2&&b.y<=s.cpuY+PAD_H/2){
-    b.x=cx-BALL;
-    const rel=(b.y-s.cpuY)/(PAD_H/2);
-    const angle=rel*65*(Math.PI/180);
-    b.vx=-Math.cos(angle)*s.speed;b.vy=Math.sin(angle)*s.speed;
-  }
-  if(b.x+BALL<0){s.scoreCpu++;s.speed=Math.max(PONG.BASE_SPEED,s.speed-0.5);Object.assign(s,{ball:resetBall(1)});updatePongHUD(s);}
-  if(b.x-BALL>W){s.scorePlayer++;s.totalPoints++;s.speed+=0.4;s.flash=8;if(s.speed>28)s.speed=28;Object.assign(s,{ball:resetBall(-1)});updatePongHUD(s);}
-  ctx.clearRect(0,0,W,H);
-  if(s.flash>0){ctx.fillStyle=`rgba(229,178,93,${s.flash*0.012})`;ctx.fillRect(0,0,W,H);s.flash--;}
-  ctx.setLineDash([6,8]);ctx.strokeStyle='rgba(74,42,56,.8)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();ctx.setLineDash([]);
-  const trailLen=Math.min(8,Math.floor(s.speed/3));
-  for(let i=trailLen;i>0;i--){
-    const alpha=0.06*(trailLen-i+1)/trailLen;
-    ctx.beginPath();ctx.arc(b.x-b.vx*i*0.6,b.y-b.vy*i*0.6,BALL*(0.5+i/trailLen*0.5),0,Math.PI*2);
-    ctx.fillStyle=`rgba(229,178,93,${alpha})`;ctx.fill();
-  }
-  ctx.beginPath();ctx.arc(b.x,b.y,BALL,0,Math.PI*2);ctx.fillStyle='#E5B25D';ctx.fill();
-  const padR=4;
-  roundRect(ctx,px,s.playerY-PAD_H/2,PAD_W,PAD_H,padR,'#E5B25D');
-  roundRect(ctx,cx,s.cpuY-PAD_H/2,PAD_W,PAD_H,padR,'#d9534f');
-  if(pongRunning)pongRaf=requestAnimationFrame(pongLoop);
 }
-function roundRect(ctx,x,y,w,h,r,color){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill();}
-function updatePongHUD(s){
-  document.getElementById('pong-score-player').textContent=s.scorePlayer;
-  document.getElementById('pong-score-cpu').textContent=s.scoreCpu;
-  document.getElementById('pong-speed-display').textContent=(s.speed/PONG.BASE_SPEED).toFixed(1)+'×';
+
+function buildSingleElim(playerList){
+  // Pad to next power of 2
+  let n=1; while(n<playerList.length)n*=2;
+  const seeded=[...playerList];
+  while(seeded.length<n)seeded.push(null);
+  const rounds=[];
+  let current=[];
+  for(let i=0;i<n;i+=2)current.push({p1:seeded[i]||'TBD',p2:seeded[i+1]||'TBD',winner:null});
+  rounds.push({type:'winners',matches:current});
+  let size=n/2;
+  while(size>1){
+    size=size/2;
+    const r=[];
+    for(let i=0;i<size;i++)r.push({p1:'TBD',p2:'TBD',winner:null});
+    rounds.push({type:'winners',matches:r});
+  }
+  return rounds;
 }
+
+function buildDoubleElim(playerList){
+  let n=1; while(n<playerList.length)n*=2;
+  const seeded=[...playerList]; while(seeded.length<n)seeded.push(null);
+  const wRounds=[];
+  let current=[];
+  for(let i=0;i<n;i+=2)current.push({p1:seeded[i]||'TBD',p2:seeded[i+1]||'TBD',winner:null});
+  wRounds.push({type:'winners',matches:current});
+  let size=n/2;
+  while(size>1){size/=2;const r=[];for(let i=0;i<size;i++)r.push({p1:'TBD',p2:'TBD',winner:null});wRounds.push({type:'winners',matches:r});}
+  // Losers bracket: roughly same number of rounds
+  const lRounds=[];
+  let lSize=n/2;
+  while(lSize>=1){const r=[];for(let i=0;i<lSize;i++)r.push({p1:'TBD',p2:'TBD',winner:null});lRounds.push({type:'losers',matches:r});lSize/=2;}
+  const grand=[{type:'grand',matches:[{p1:'TBD',p2:'TBD',winner:null}]}];
+  return [...wRounds,...lRounds,...grand];
+}
+
+window.openNewBracketModal=function(){
+  if(!isAdmin){alert('Admin login required to create brackets.');return;}
+  const cb=document.getElementById('bracket-player-checkboxes');
+  cb.innerHTML=players.map(p=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.1rem 0"><input type="checkbox" value="${esc(p.name)}" style="width:auto;accent-color:var(--accent)"> ${esc(p.name)}</label>`).join('');
+  document.getElementById('bracket-name-input').value='';
+  document.getElementById('bracket-create-msg').style.display='none';
+  document.getElementById('new-bracket-overlay').classList.add('open');
+};
+
+window.createBracket=function(){
+  const name=document.getElementById('bracket-name-input').value.trim();
+  if(!name){showMsg('bracket-create-msg','Enter a tournament name.',true);return;}
+  const format=document.getElementById('bracket-format').value;
+  const checked=Array.from(document.querySelectorAll('#bracket-player-checkboxes input:checked')).map(el=>el.value);
+  if(checked.length<2){showMsg('bracket-create-msg','Select at least 2 players.',true);return;}
+  const rounds=format==='double'?buildDoubleElim(checked):buildSingleElim(checked);
+  brackets.push({id:Date.now(),name,format,players:checked,rounds,createdAt:Date.now()});
+  saveBracketsToStorage();
+  document.getElementById('new-bracket-overlay').classList.remove('open');
+  showPanel('brackets',document.querySelector('nav button[onclick*="brackets"]'));
+};
+
+window.deleteBracket=function(bi){
+  if(!confirm('Delete this bracket?'))return;
+  brackets.splice(bi,1);
+  saveBracketsToStorage();
+  renderBrackets();
+};
+
+function saveBracketsToStorage(){
+  try{localStorage.setItem('tttiw_brackets',JSON.stringify(brackets));}catch(e){}
+}
+function loadBracketsFromStorage(){
+  try{const d=localStorage.getItem('tttiw_brackets');if(d)brackets=JSON.parse(d);}catch(e){}
+}
+loadBracketsFromStorage();
+
+// ── SIMULATOR ─────────────────────────────────────────────────────────────────
+window.simResult=function(winner){
+  const rA=parseFloat(document.getElementById('sim-a-rating').value)||1500;
+  const rB=parseFloat(document.getElementById('sim-b-rating').value)||1500;
+  const rdA=parseFloat(document.getElementById('sim-a-rd').value)||120;
+  const rdB=parseFloat(document.getElementById('sim-b-rd').value)||120;
+  const sA=parseFloat(document.getElementById('sim-a-sigma').value)||SIGMA_DEFAULT;
+  const sB=parseFloat(document.getElementById('sim-b-sigma').value)||SIGMA_DEFAULT;
+  const pA={rating:rA,rd:Math.max(30,Math.min(200,rdA)),sigma:Math.max(0.01,Math.min(SIGMA_MAX,sA))};
+  const pB={rating:rB,rd:Math.max(30,Math.min(200,rdB)),sigma:Math.max(0.01,Math.min(SIGMA_MAX,sB))};
+  const sWins=winner==='A'?1:0;
+  const sLoses=1-sWins;
+  const newA=g2Update(pA,[{rating:pB.rating,rd:pB.rd,sigma:pB.sigma,s:sWins}]);
+  const newB=g2Update(pB,[{rating:pA.rating,rd:pA.rd,sigma:pA.sigma,s:sLoses}]);
+  const dA=+(newA.rating-pA.rating).toFixed(1);
+  const dB=+(newB.rating-pB.rating).toFixed(1);
+  // expected score for A
+  const{mu:muA,phi:phiA}=toG2(pA.rating,pA.rd);
+  const{mu:muB,phi:phiB}=toG2(pB.rating,pB.rd);
+  const expA=(E(muA,muB,phiB)*100).toFixed(1);
+  const expB=(100-parseFloat(expA)).toFixed(1);
+  const el=document.getElementById('sim-result');
+  const fmtDelta=(d)=>`<span style="color:${d>=0?'var(--win)':'var(--loss)'}">${d>=0?'+':''}${d}</span>`;
+  const fmtRD=(old_,new_)=>{const d=+(new_-old_).toFixed(1);return `${new_} <span style="font-size:.58rem;color:${d<=0?'var(--win)':'var(--loss)'}">(${d>0?'+':''}${d})</span>`;};
+  el.style.display='block';
+  el.innerHTML=`
+    <div style="color:var(--accent);font-size:.7rem;margin-bottom:.5rem;letter-spacing:.06em">⚡ ${winner} WINS — Result Preview</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem 1.5rem">
+      <div><span style="color:var(--muted)">A Win Probability:</span> ${expA}%</div>
+      <div><span style="color:var(--muted)">B Win Probability:</span> ${expB}%</div>
+      <div style="grid-column:1/-1;border-top:1px solid var(--border);margin:.25rem 0"></div>
+      <div><span style="color:var(--muted)">A Rating:</span> ${pA.rating} → <strong>${newA.rating}</strong> ${fmtDelta(dA)}</div>
+      <div><span style="color:var(--muted)">B Rating:</span> ${pB.rating} → <strong>${newB.rating}</strong> ${fmtDelta(dB)}</div>
+      <div><span style="color:var(--muted)">A RD:</span> ${fmtRD(pA.rd,newA.rd)}</div>
+      <div><span style="color:var(--muted)">B RD:</span> ${fmtRD(pB.rd,newB.rd)}</div>
+      <div><span style="color:var(--muted)">A σ:</span> ${pA.sigma} → ${newA.sigma}</div>
+      <div><span style="color:var(--muted)">B σ:</span> ${pB.sigma} → ${newB.sigma}</div>
+    </div>`;
+};
+
+window.clearSim=function(){
+  ['sim-a-rating','sim-b-rating'].forEach(id=>document.getElementById(id).value='1500');
+  ['sim-a-rd','sim-b-rd','sim-a-sigma','sim-b-sigma'].forEach(id=>document.getElementById(id).value='');
+  const el=document.getElementById('sim-result');if(el)el.style.display='none';
+};
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
