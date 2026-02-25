@@ -626,7 +626,7 @@ const ADMIN_PW='pppaddle';
 const RD_MAX=200;
 const SIGMA_DEFAULT=0.06;
 const SIGMA_MAX=0.30;
-const TAU=0.5;
+const TAU=1.2;
 const EPSILON=0.000001;
 
 // Show subtitle on wider screens
@@ -1468,7 +1468,7 @@ window.adminRemoveMatch=async function(fid){
 
 // ── REPAIR RATINGS ─────────────────────────────────────────────────────────
 window.repairAllRatings=async function(){
-  if(!confirm('Recalculate all ratings, RDs, and volatilities from match history?'))return;
+  if(!confirm('Replay all matches from scratch and rewrite every match record + player stats with correct ratings, RD, and volatility?'))return;
   const btn=document.querySelector('[onclick="repairAllRatings()"]');
   if(btn){btn.disabled=true;btn.textContent='Repairing…';}
   try{
@@ -1477,23 +1477,57 @@ window.repairAllRatings=async function(){
     const now=Date.now();
     const periodMs=decayMs();
 
-    const lastMatchState={};
+    // Build a fresh state map for every player, starting from scratch
+    const state={};
+    const initPlayer=pid=>{
+      if(!state[pid])state[pid]={rating:1500,rd:120,sigma:SIGMA_DEFAULT,wins:0,losses:0,lastMatchAt:null};
+    };
+
+    const matchWrites=[];
+
     for(const m of allMatches){
+      const pid1=m.p1id, pid2=m.p2id;
+      initPlayer(pid1); initPlayer(pid2);
+      const s1=state[pid1], s2=state[pid2];
+
+      // Recalculate both sides from current state
+      const u1=g2Update(
+        {rating:s1.rating,rd:s1.rd,sigma:s1.sigma},
+        [{rating:s2.rating,rd:s2.rd,sigma:s2.sigma,s:1}]
+      );
+      const u2=g2Update(
+        {rating:s2.rating,rd:s2.rd,sigma:s2.sigma},
+        [{rating:s1.rating,rd:s1.rd,sigma:s1.sigma,s:0}]
+      );
+
+      const p1delta=Math.round((u1.rating-s1.rating)*10)/10;
+      const p2delta=Math.round((u2.rating-s2.rating)*10)/10;
+
+      // Rewrite the match record with correct values
+      matchWrites.push(updateDoc(doc(db,'matches',m.firestoreId),{
+        p1oldRating:s1.rating, p1newRating:u1.rating, p1newRD:u1.rd, p1newSigma:u1.sigma, p1delta,
+        p2oldRating:s2.rating, p2newRating:u2.rating, p2newRD:u2.rd, p2newSigma:u2.sigma, p2delta,
+      }));
+
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      if(!lastMatchState[m.p1id])lastMatchState[m.p1id]={rating:1500,rd:120,sigma:SIGMA_DEFAULT,wins:0,losses:0,lastMatchAt:null};
-      if(!lastMatchState[m.p2id])lastMatchState[m.p2id]={rating:1500,rd:120,sigma:SIGMA_DEFAULT,wins:0,losses:0,lastMatchAt:null};
-      lastMatchState[m.p1id]={rating:m.p1newRating,rd:m.p1newRD,sigma:m.p1newSigma||SIGMA_DEFAULT,wins:(lastMatchState[m.p1id].wins||0)+1,losses:lastMatchState[m.p1id].losses||0,lastMatchAt:ts};
-      lastMatchState[m.p2id]={rating:m.p2newRating,rd:m.p2newRD,sigma:m.p2newSigma||SIGMA_DEFAULT,wins:lastMatchState[m.p2id].wins||0,losses:(lastMatchState[m.p2id].losses||0)+1,lastMatchAt:ts};
+
+      // Advance state
+      state[pid1]={rating:u1.rating,rd:u1.rd,sigma:u1.sigma,wins:s1.wins+1,losses:s1.losses,lastMatchAt:ts};
+      state[pid2]={rating:u2.rating,rd:u2.rd,sigma:u2.sigma,wins:s2.wins,losses:s2.losses+1,lastMatchAt:ts};
     }
 
-    const updates=[];
+    // Write match records first
+    await Promise.all(matchWrites);
+
+    // Now apply decay from last match to now and write player docs
+    const playerWrites=[];
     for(const p of players){
-      const state=lastMatchState[p.firestoreId];
-      if(!state)continue;
-      const sigma=state.sigma||SIGMA_DEFAULT;
-      let rd=state.rd;
-      if(state.lastMatchAt&&periodMs>0){
-        const basePeriod=Math.floor(state.lastMatchAt/periodMs);
+      const s=state[p.firestoreId];
+      if(!s)continue;
+      let rd=s.rd;
+      const sigma=s.sigma||SIGMA_DEFAULT;
+      if(s.lastMatchAt&&periodMs>0){
+        const basePeriod=Math.floor(s.lastMatchAt/periodMs);
         const nowPeriod=Math.floor(now/periodMs);
         const periods=nowPeriod-basePeriod;
         if(periods>0){
@@ -1504,13 +1538,13 @@ window.repairAllRatings=async function(){
       }
       const nowPeriod=Math.floor(now/periodMs);
       const lastDecayAt=nowPeriod*periodMs;
-      updates.push(updateDoc(doc(db,'players',p.firestoreId),{
-        rating:state.rating,rd,sigma,wins:state.wins,losses:state.losses,lastDecayAt
+      playerWrites.push(updateDoc(doc(db,'players',p.firestoreId),{
+        rating:s.rating,rd,sigma,wins:s.wins,losses:s.losses,lastDecayAt
       }));
     }
 
-    await Promise.all(updates);
-    showMsg('repair-msg',`Repaired ${updates.length} player(s) from match history.`);
+    await Promise.all(playerWrites);
+    showMsg('repair-msg',`Rewrote ${matchWrites.length} match records · repaired ${playerWrites.length} player(s).`);
   }catch(e){
     showMsg('repair-msg','Error: '+e.message,true);
   }finally{
@@ -1842,7 +1876,7 @@ function drawChart(points){
     for(let i=0;i<points.length;i++){const pt=points[i],col=i===0?'#8a6a78':(pt.won?'#7ec8a0':'#ff4757'),isHl=i===hl;if(isHl){ctx.beginPath();ctx.arc(xOf(i),yOf(pt.rating),8,0,Math.PI*2);ctx.fillStyle=i===0?'rgba(138,106,120,.2)':(pt.won?'rgba(126,200,160,.2)':'rgba(217,83,79,.2)');ctx.fill();}ctx.beginPath();ctx.arc(xOf(i),yOf(pt.rating),isHl?5:3.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();if(isHl){ctx.beginPath();ctx.arc(xOf(i),yOf(pt.rating),1.5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();}}
     if(hl>=0){ctx.beginPath();ctx.moveTo(xOf(hl),PAD.top);ctx.lineTo(xOf(hl),H-PAD.bottom);ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.stroke();ctx.setLineDash([]);}
   }
-  function showTip(idx){const pt=points[idx],col=idx===0?'#8a6a78':(pt.won?'#7ec8a0':'#ff4757');let html=`<span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${col}">${r2(pt.rating)}</span>`;if(idx===0)html+=`<br><span style="color:#8a6a78">Starting rating</span>`;else{const d=new Date(pt.date),ds=pt.rating-points[idx-1].rating,df=(ds>=0?'+':`${r2(Math.abs(ds))}`,dt=d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));html+=`<br><span style="color:${col}">${pt.won?'WIN':'LOSS'}</span> vs ${esc(pt.label)}<br><span style="color:${col}">${df} pts</span> · ${dt}`;}tip.innerHTML=html;tip.style.display='block';tip.style.left='-9999px';tip.style.top='-9999px';requestAnimationFrame(()=>{const dx=xOf(idx),dy=yOf(pt.rating),tw=tip.offsetWidth,th=tip.offsetHeight;let l=Math.max(PAD.left,Math.min(dx-tw/2,W-PAD.right-tw)),t=dy-th-10;if(t<PAD.top)t=dy+14;tip.style.left=l+'px';tip.style.top=t+'px';});}
+  function showTip(idx){const pt=points[idx],col=idx===0?'#8a6a78':(pt.won?'#7ec8a0':'#ff4757');let html=`<span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${col}">${r2(pt.rating)}</span>`;if(idx===0)html+=`<br><span style="color:#8a6a78">Starting rating</span>`;else{const d=new Date(pt.date);const ds=pt.rating-points[idx-1].rating;const df=(ds>=0?'+':'')+r2(Math.abs(ds));const dt=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+=`<br><span style="color:${col}">${pt.won?'WIN':'LOSS'}</span> vs ${esc(pt.label)}<br><span style="color:${col}">${df} pts</span> · ${dt}`;}tip.innerHTML=html;tip.style.display='block';tip.style.left='-9999px';tip.style.top='-9999px';requestAnimationFrame(()=>{const dx=xOf(idx),dy=yOf(pt.rating),tw=tip.offsetWidth,th=tip.offsetHeight;let l=Math.max(PAD.left,Math.min(dx-tw/2,W-PAD.right-tw)),t=dy-th-10;if(t<PAD.top)t=dy+14;tip.style.left=l+'px';tip.style.top=t+'px';});}
   redraw(-1);let hl=-1;
   function near(cx){let b=-1,bd=Infinity;for(let i=0;i<points.length;i++){const d=Math.abs(xOf(i)-cx);if(d<bd){bd=d;b=i;}}return bd<34?b:-1;}
   function onMove(e){const r=canvas.getBoundingClientRect(),cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left,idx=near(cx*(canvas.width/r.width));if(idx!==hl){hl=idx;redraw(idx);if(idx>=0)showTip(idx);else tip.style.display='none';}}
