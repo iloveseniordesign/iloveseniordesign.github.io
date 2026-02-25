@@ -359,7 +359,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
           <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
           <div class="msg" id="player-msg"></div>
           <p style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);margin-top:.65rem;line-height:1.7">
-            New players start at <span style="color:var(--accent)">1500</span> · RD <span style="color:var(--accent)">120</span> · σ <span style="color:var(--accent)">0.15</span>.<br>
+            New players start at <span style="color:var(--accent)">1500</span> · RD <span style="color:var(--accent)">120</span> · σ <span style="color:var(--accent)">0.06</span>.<br>
             Tap any player card to add a profile photo &amp; quote.
           </p>
         </div>
@@ -407,7 +407,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.08em;color:var(--text);margin:1.75rem 0 1.1rem">Rating System</div>
       <div class="rules-list">
         <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">RD</div><div><div class="rule-title">Rating Deviation</div><div class="rule-desc">RD measures how confident the system is in a player's rating. A low RD means the rating is reliable; a high RD means more uncertainty. New players start at RD 120. After enough games, RD can drop below 100 — only then does a player appear on the leaderboard.</div></div></div>
-        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">σ</div><div><div class="rule-title">Volatility (σ)</div><div class="rule-desc">Volatility measures how erratic a player's performance is. A higher σ means results are unpredictable — the system reacts more strongly to upsets. It's updated each match using the full Glicko-2 Illinois algorithm. Starting σ: 0.15. Capped at 0.30.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">σ</div><div><div class="rule-title">Volatility (σ)</div><div class="rule-desc">Volatility measures how erratic a player's performance is. A higher σ means results are unpredictable — the system reacts more strongly to upsets. It's updated each match using the full Glicko-2 Illinois algorithm. Starting σ: 0.06. Capped at 0.30.</div></div></div>
         <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">⏱ RD</div><div><div class="rule-title">RD Decay (Inactivity)</div><div class="rule-desc">If you stop playing, your RD slowly increases using your personal volatility: φ* = √(φ² + σ²). This means volatile players decay faster than consistent ones. RD is capped at 200. If RD rises above 100 you'll be hidden from the leaderboard.</div></div></div>
         <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">G2</div><div><div class="rule-title">Glicko-2 Algorithm</div><div class="rule-desc">Full Glicko-2 implementation including per-player volatility updates via the Illinois root-finding method. Every match updates rating, RD, and volatility based on expected outcome — upsets gain more, expected wins gain less. Starting rating: 1500.</div></div></div>
       </div>
@@ -421,7 +421,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       <div class="admin-section">
         <div class="admin-stitle">Season Settings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.3);max-width:480px">
-          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Set a season end date. When the deadline passes, you can trigger a season reset — all ratings return to 1500, RD to 120, volatility to 0.15, wins/losses to 0, and a snapshot of final rankings is saved to each player's history.</p>
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Set a season end date. When the deadline passes, you can trigger a season reset — all ratings return to 1500, RD to 120, volatility to 0.06, wins/losses to 0, and a snapshot of final rankings is saved to each player's history.</p>
           <div class="field">
             <label>Season Name</label>
             <input type="text" id="season-name-input" placeholder="e.g. Spring 2025">
@@ -626,7 +626,7 @@ const db=getFirestore(app);
 let players=[],matches=[],isAdmin=false,curProfileId=null;
 const ADMIN_PW='pppaddle';
 const RD_MAX=200;
-const SIGMA_DEFAULT=0.15;
+const SIGMA_DEFAULT=0.06;
 const SIGMA_MAX=0.30;
 const TAU=1.2;
 const EPSILON=0.000001;
@@ -1158,7 +1158,7 @@ window.saveSeason=async function(){
 };
 
 window.triggerSeasonReset=async function(){
-  if(!confirm(`This will:\n1. Save each player's rank, stats & full match history for this season\n2. Reset ALL ratings to 1500, RD to 120, volatility to 0.15, wins/losses to 0\n3. Clear all matches from the active log\n\nSeason: "${seasonConfig.name||'Current'}"\n\nThis cannot be undone. Continue?`))return;
+  if(!confirm(`This will:\n1. Save each player's rank, stats & full match history for this season\n2. Reset ALL ratings to 1500, RD to 120, volatility to 0.06, wins/losses to 0\n3. Clear all matches from the active log\n\nSeason: "${seasonConfig.name||'Current'}"\n\nThis cannot be undone. Continue?`))return;
   const btn=document.getElementById('reset-season-btn');btn.disabled=true;btn.textContent='Archiving…';
   try{
     const sNum=seasonConfig.seasonNum||1;
