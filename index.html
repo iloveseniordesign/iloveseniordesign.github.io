@@ -626,9 +626,8 @@ const ADMIN_PW='pppaddle';
 const RD_MAX=200;
 const SIGMA_DEFAULT=0.06;
 const SIGMA_MAX=0.30;
-// Glicko-2 Illinois algorithm constants
-const TAU=0.5;      // system constant controlling volatility change — smaller = less change
-const EPSILON=0.000001; // convergence tolerance
+const TAU=0.5;
+const EPSILON=0.000001;
 
 // Show subtitle on wider screens
 const mq=window.matchMedia('(min-width:520px)');
@@ -636,47 +635,31 @@ const toggleSub=()=>document.getElementById('header-sub-text').style.display=mq.
 mq.addEventListener('change',toggleSub); toggleSub();
 
 // ── FULL GLICKO-2 WITH ILLINOIS VOLATILITY UPDATE ────────────────────────────
-// All math follows the Glicko-2 specification by Mark Glickman (2012)
-// https://www.glicko.net/glicko/glicko2.pdf
+const SCALE = 173.7178;
 
-const SCALE = 173.7178; // converts between Glicko-1 and Glicko-2 scales
-
-// Convert from Glicko-1 scale to Glicko-2 internal scale
 function toG2(r, rd) {
   return { mu: (r - 1500) / SCALE, phi: rd / SCALE };
 }
-// Convert from Glicko-2 internal scale back to Glicko-1 scale
 function fromG2(mu, phi) {
   return { r: mu * SCALE + 1500, rd: phi * SCALE };
 }
-
-// g(φ) — reduces impact of opponents with high RD
 function gPhi(phi) {
   return 1 / Math.sqrt(1 + 3 * phi * phi / (Math.PI * Math.PI));
 }
-
-// E(μ, μⱼ, φⱼ) — expected score against opponent j
 function E(mu, muj, phij) {
   return 1 / (1 + Math.exp(-gPhi(phij) * (mu - muj)));
 }
 
-/**
- * Full Glicko-2 update for a player against a list of opponents in one rating period.
- * Each opp: { rating, rd, sigma, s } where s=1 win, s=0 loss
- * Returns: { rating, rd, sigma }
- */
 function g2Update(player, opps) {
   const { mu, phi } = toG2(player.rating, player.rd);
   const sigma = player.sigma || SIGMA_DEFAULT;
 
-  // Step 3: If no games played, only increase RD by volatility (already handled by decay)
   if (!opps.length) {
     const phiStar = Math.sqrt(phi * phi + sigma * sigma);
     const r = fromG2(mu, Math.min(phiStar, RD_MAX / SCALE));
     return { rating: Math.round(r.r * 10) / 10, rd: Math.round(r.rd * 10) / 10, sigma };
   }
 
-  // Step 3: compute v (estimated variance) and delta (estimated improvement)
   let vInv = 0, deltaSum = 0;
   for (const o of opps) {
     const { mu: muj, phi: phij } = toG2(o.rating, o.rd);
@@ -688,16 +671,9 @@ function g2Update(player, opps) {
   const v = 1 / vInv;
   const delta = v * deltaSum;
 
-  // Step 4: compute new volatility σ' using Illinois algorithm
   const newSigma = computeNewSigma(sigma, phi, v, delta);
-
-  // Step 5: update phi* (pre-match RD inflated by new volatility)
   const phiStar = Math.sqrt(phi * phi + newSigma * newSigma);
-
-  // Step 6: compute new phi
   const phiNew = 1 / Math.sqrt(1 / (phiStar * phiStar) + 1 / v);
-
-  // Step 7: compute new mu
   const muNew = mu + phiNew * phiNew * deltaSum;
 
   const r = fromG2(muNew, phiNew);
@@ -708,31 +684,23 @@ function g2Update(player, opps) {
   };
 }
 
-/**
- * Illinois algorithm to find new volatility σ'.
- * Solves for x = ln(σ'²) such that f(x) = 0.
- * This is the heart of Glicko-2 that was missing before.
- */
 function computeNewSigma(sigma, phi, v, delta) {
   const a = Math.log(sigma * sigma);
   const tau2 = TAU * TAU;
   const phi2 = phi * phi;
   const delta2 = delta * delta;
 
-  // f(x) as defined in the Glicko-2 paper
   function f(x) {
     const ex = Math.exp(x);
     const d2 = phi2 + v + ex;
     return (ex * (delta2 - phi2 - v - ex)) / (2 * d2 * d2) - (x - a) / tau2;
   }
 
-  // Initialize bracket [A, B] for Illinois method
   let A = a;
   let B;
   if (delta2 > phi2 + v) {
     B = Math.log(delta2 - phi2 - v);
   } else {
-    // Find upper bound by halving
     let k = 1;
     while (f(a - k * TAU) < 0) k++;
     B = a - k * TAU;
@@ -741,7 +709,6 @@ function computeNewSigma(sigma, phi, v, delta) {
   let fA = f(A);
   let fB = f(B);
 
-  // Illinois root-finding iteration
   let iterations = 0;
   while (Math.abs(B - A) > EPSILON && iterations < 500) {
     const C = A + (A - B) * fA / (fB - fA);
@@ -749,7 +716,7 @@ function computeNewSigma(sigma, phi, v, delta) {
     if (fC * fB <= 0) {
       A = B; fA = fB;
     } else {
-      fA = fA / 2; // Illinois modification — halve fA to force convergence
+      fA = fA / 2;
     }
     B = C; fB = fC;
     iterations++;
@@ -803,11 +770,19 @@ onSnapshot(doc(db,'config','decay'),snap=>{
     const sel=document.getElementById('decay-unit');
     if(sel){for(let o of sel.options){if(o.value===unt){o.selected=true;break;}}}
   }
-  applyDecayLocally();updateDecayStatus();
+  updateDecayStatus();
   updateDecayInfo();
+  // applyDecayLocally is handled solely by scheduleDecay loop, not here
 });
 setInterval(updateDecayStatus,1000);
-setInterval(applyDecayLocally,5000);
+
+// ── Decay scheduler: fires once per decay period, self-reschedules ──
+const pendingDecayWrites = new Set();
+function scheduleDecay(){
+  applyDecayLocally();
+  setTimeout(scheduleDecay, decayMs());
+}
+scheduleDecay();
 
 function updateDecayInfo(){
   const di=document.getElementById('decay-info');
@@ -825,38 +800,28 @@ function decayMs(){
   if(u==='hours')return a*36e5;
   return a*864e5;
 }
-const DECAY_EPOCH=new Date('2025-01-01T00:00:00Z').getTime();
 
+// Periods aligned to Unix epoch (midnight UTC for days, top-of-hour for hours)
 function currentDecayPeriod(ms){
-  return Math.floor((Date.now()-DECAY_EPOCH)/ms);
+  return Math.floor(Date.now()/ms);
 }
 
 function computeDecay(p){
   const ms=decayMs();
-  // Use the player's personal volatility for decay — more volatile players decay faster
   const sigma=p.sigma||SIGMA_DEFAULT;
-  const pid=p.firestoreId;
-  let lastMatchTs=0;
-  for(const m of matches){
-    if(m.p1id===pid||m.p2id===pid){
-      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      if(ts>lastMatchTs)lastMatchTs=ts;
-    }
-  }
-  const lastProcessed=Math.max(p.lastDecayAt||DECAY_EPOCH, lastMatchTs||DECAY_EPOCH);
-  const basePeriod=Math.floor((lastProcessed-DECAY_EPOCH)/ms);
+  const lastProcessed=p.lastDecayAt||0;
+  const basePeriod=Math.floor(lastProcessed/ms);
   const nowPeriod=currentDecayPeriod(ms);
   const per=nowPeriod-basePeriod;
   if(per<=0)return null;
 
-  // φ* = √(φ² + σ²) — uses player's own sigma, not a fixed constant
   let phi=p.rd/SCALE, phiMax=RD_MAX/SCALE;
   for(let i=0;i<per;i++){
     phi=Math.sqrt(phi*phi+sigma*sigma);
     if(phi>=phiMax){phi=phiMax;break;}
   }
 
-  const newLast=DECAY_EPOCH+nowPeriod*ms;
+  const newLast=nowPeriod*ms;
   return{newRD:Math.round(Math.min(phi*SCALE,RD_MAX)*10)/10, newLast};
 }
 
@@ -864,8 +829,12 @@ function applyDecayLocally(){
   const ranked=players.filter(p=>p.rd<=100).sort((a,b)=>b.rating-a.rating);
   const topBefore=ranked[0]||null;
   players.forEach(p=>{
+    // Skip if a write is already in-flight for this player
+    if(pendingDecayWrites.has(p.firestoreId))return;
     const r=computeDecay(p);if(!r)return;
-    p.rd=r.newRD;p.lastDecayAt=r.newLast;
+    // Update in-memory state FIRST so the next tick sees the new value
+    p.rd=r.newRD;
+    p.lastDecayAt=r.newLast;
     const upd={rd:r.newRD,lastDecayAt:r.newLast};
     if(topBefore&&p.firestoreId===topBefore.firestoreId&&r.newRD>100&&p.no1Since){
       const dur=Date.now()-(p.no1Since||Date.now());
@@ -874,7 +843,11 @@ function applyDecayLocally(){
       if(dur>prev)upd.longestNo1Ms=dur;
       p.no1Since=null;if(dur>prev)p.longestNo1Ms=dur;
     }
-    updateDoc(doc(db,'players',p.firestoreId),upd).catch(()=>{});
+    // Lock this player until Firestore confirms the write
+    pendingDecayWrites.add(p.firestoreId);
+    updateDoc(doc(db,'players',p.firestoreId),upd)
+      .catch(()=>{})
+      .finally(()=>pendingDecayWrites.delete(p.firestoreId));
   });
 }
 
@@ -885,8 +858,8 @@ function updateDecayStatus(){
   const a=document.getElementById('decay-amount').value||'4';
   const u=document.getElementById('decay-unit').value||'hours';
   const lbl=a+u.charAt(0).toUpperCase();
-  const nowPeriod=Math.floor((now-DECAY_EPOCH)/ms);
-  const nextTick=DECAY_EPOCH+(nowPeriod+1)*ms;
+  const nowPeriod=Math.floor(now/ms);
+  const nextTick=(nowPeriod+1)*ms;
   const diff=nextTick-now;
   if(diff>0){const h=Math.floor(diff/36e5),m=Math.floor((diff%36e5)/6e4),s=Math.floor((diff%6e4)/1e3);el.textContent='DECAY·'+lbl+'·NEXT '+(h>0?h+'h'+m+'m':m+'m'+s+'s');}
   else el.textContent='DECAY·'+lbl;
@@ -1076,7 +1049,6 @@ function pStats(fid){
           for(const id of Object.keys(rds)){
             let phi=rds[id]/SCALE;
             const phiMax=RD_MAX/SCALE;
-            // Use each player's sigma for decay simulation
             const pSigma=(players.find(x=>x.firestoreId===id)?.sigma)||SIGMA_DEFAULT;
             for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+pSigma*pSigma);if(phi>=phiMax){phi=phiMax;break;}}
             rds[id]=Math.min(phi*SCALE,RD_MAX);
@@ -1282,7 +1254,6 @@ window.submitMatch=async function(){
       if(!ws.exists()||!ls.exists())throw new Error('Player not found');
       const w=ws.data(),l=ls.data();
 
-      // Full Glicko-2 update — each player gets opponent's current sigma too
       const uw=g2Update(
         {rating:w.rating, rd:w.rd, sigma:w.sigma||SIGMA_DEFAULT},
         [{rating:l.rating, rd:l.rd, sigma:l.sigma||SIGMA_DEFAULT, s:1}]
@@ -1506,7 +1477,6 @@ window.repairAllRatings=async function(){
     const now=Date.now();
     const periodMs=decayMs();
 
-    // Build final state from stored match records
     const lastMatchState={};
     for(const m of allMatches){
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
@@ -1523,8 +1493,8 @@ window.repairAllRatings=async function(){
       const sigma=state.sigma||SIGMA_DEFAULT;
       let rd=state.rd;
       if(state.lastMatchAt&&periodMs>0){
-        const basePeriod=Math.floor((state.lastMatchAt-DECAY_EPOCH)/periodMs);
-        const nowPeriod=Math.floor((now-DECAY_EPOCH)/periodMs);
+        const basePeriod=Math.floor(state.lastMatchAt/periodMs);
+        const nowPeriod=Math.floor(now/periodMs);
         const periods=nowPeriod-basePeriod;
         if(periods>0){
           let phi=rd/SCALE;const phiMax=RD_MAX/SCALE;
@@ -1532,8 +1502,8 @@ window.repairAllRatings=async function(){
           rd=Math.round(Math.min(phi*SCALE,RD_MAX)*10)/10;
         }
       }
-      const nowPeriod=Math.floor((now-DECAY_EPOCH)/periodMs);
-      const lastDecayAt=DECAY_EPOCH+nowPeriod*periodMs;
+      const nowPeriod=Math.floor(now/periodMs);
+      const lastDecayAt=nowPeriod*periodMs;
       updates.push(updateDoc(doc(db,'players',p.firestoreId),{
         rating:state.rating,rd,sigma,wins:state.wins,losses:state.losses,lastDecayAt
       }));
