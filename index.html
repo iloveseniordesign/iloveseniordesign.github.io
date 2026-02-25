@@ -488,6 +488,22 @@ input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{
       </div>
 
       <div class="admin-section" style="max-width:480px">
+        <div class="admin-stitle">Restore Previous Season</div>
+        <div class="form-card" style="border-color:rgba(217,83,79,.3)">
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Accidentally reset a season? Select a past season to restore — this will recreate all matches from that season's archived history, restore each player's final stats, and roll back the season number. <strong style="color:var(--loss)">Current live matches will be cleared.</strong></p>
+          <div class="field">
+            <label>Season to Restore</label>
+            <select id="restore-season-select" style="width:100%">
+              <option value="">— Loading seasons… —</option>
+            </select>
+          </div>
+          <div id="restore-season-preview" style="display:none;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);line-height:1.8;padding:.55rem .75rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.9rem"></div>
+          <button class="btn-danger" id="restore-season-btn" onclick="restoreSeason()" style="padding:.65rem 1.2rem;font-size:.65rem">↩ Restore This Season</button>
+          <div class="msg" id="restore-msg" style="margin-top:.65rem"></div>
+        </div>
+      </div>
+
+      <div class="admin-section" style="max-width:480px">
         <div class="admin-stitle">RD Decay Settings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.15)">
           <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">RD increases each inactive period using each player's personal volatility: <strong style="color:var(--text)">φ* = √(φ² + σ²)</strong>. Volatile players decay faster. Default: 4 hours · Max RD: 200 · Hidden from leaderboard if RD &gt; 100.</p>
@@ -897,7 +913,7 @@ window.submitAdminLogin=function(){
     if(lbl)lbl.textContent=' Logout';
     document.getElementById('admin-btn').classList.add('on');
     document.getElementById('admin-tab-btn').style.display='';
-    renderAdminPanel();renderPastTournaments();
+    renderAdminPanel();renderPastTournaments();populateRestoreSeasonDropdown();
   }else{const m=document.getElementById('admin-login-msg');m.textContent='Incorrect password.';m.className='msg err';m.style.display='block';}
 };
 
@@ -905,7 +921,7 @@ window.submitAdminLogin=function(){
 onSnapshot(query(collection(db,'players'),orderBy('rating','desc')),snap=>{
   players=snap.docs.map(d=>({firestoreId:d.id,...d.data()}));
   renderLeaderboard();renderPlayersList();renderMatchSelects();updateDecayStatus();
-  if(isAdmin){renderAdminPanel();simPopulateDropdowns();}
+  if(isAdmin){renderAdminPanel();simPopulateDropdowns();populateRestoreSeasonDropdown();}
 },err=>console.error(err));
 
 onSnapshot(query(collection(db,'matches'),orderBy('date','desc')),snap=>{
@@ -1377,7 +1393,165 @@ window.triggerSeasonReset=async function(){
   finally{btn.disabled=false;btn.textContent='⚡ Reset Season Now';}
 };
 
-// ── MATCH LOCK ────────────────────────────────────────────────────────────────
+// ── RESTORE PREVIOUS SEASON ──────────────────────────────────────────────────
+async function populateRestoreSeasonDropdown(){
+  const sel=document.getElementById('restore-season-select');
+  if(!sel)return;
+  // Collect all unique past seasons across all players
+  const seasonMap={}; // seasonNum -> {seasonNum, seasonName, endedAt, playerCount}
+  players.forEach(p=>{
+    (p.seasons||[]).forEach(s=>{
+      const k=s.seasonNum;
+      if(!seasonMap[k]){seasonMap[k]={seasonNum:s.seasonNum,seasonName:s.seasonName||('Season '+s.seasonNum),endedAt:s.endedAt,players:0};}
+      seasonMap[k].players++;
+    });
+  });
+  const sorted=Object.values(seasonMap).sort((a,b)=>b.seasonNum-a.seasonNum);
+  if(!sorted.length){sel.innerHTML='<option value="">— No past seasons found —</option>';return;}
+  sel.innerHTML='<option value="">— Select a season to restore —</option>'+sorted.map(s=>{
+    const dt=s.endedAt?new Date(s.endedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    return`<option value="${s.seasonNum}">${esc(s.seasonName)} (${s.players} players${dt?' · ended '+dt:''})</option>`;
+  }).join('');
+  sel.onchange=function(){
+    const num=parseInt(this.value);
+    const prev=document.getElementById('restore-season-preview');
+    if(!num){prev.style.display='none';return;}
+    const s=seasonMap[num];
+    if(!s){prev.style.display='none';return;}
+    const plist=players.filter(p=>(p.seasons||[]).some(x=>x.seasonNum===num)).map(p=>{
+      const entry=(p.seasons||[]).find(x=>x.seasonNum===num);
+      return`<strong style="color:var(--text)">${esc(p.name)}</strong> — #${entry.rank} · ${r2(entry.rating)} (${entry.wins}W–${entry.losses}L)`;
+    }).join('<br>');
+    prev.style.display='block';
+    prev.innerHTML=`<strong style="color:var(--accent)">Season: ${esc(s.seasonName)}</strong><br>${plist||'<em>No players found</em>'}`;
+  };
+}
+
+window.restoreSeason=async function(){
+  const sel=document.getElementById('restore-season-select');
+  const sNum=parseInt(sel?.value);
+  if(!sNum){showMsg('restore-msg','Select a season first.',true);return;}
+
+  // Find season name from player data
+  let sName='Season '+sNum;
+  for(const p of players){
+    const e=(p.seasons||[]).find(x=>x.seasonNum===sNum);
+    if(e?.seasonName){sName=e.seasonName;break;}
+  }
+
+  const currentMatchCount=matches.length;
+  if(!confirm(`Restore "${sName}"?\n\nThis will:\n1. DELETE all ${currentMatchCount} current live match(es)\n2. Recreate ${sName}'s match history from archived data\n3. Restore each player's final ratings, wins & losses from that season\n4. Roll season number back to ${sNum}\n5. Remove the season-${sNum} entry from each player's history\n\nThis cannot be undone. Continue?`))return;
+
+  const btn=document.getElementById('restore-season-btn');
+  btn.disabled=true;btn.textContent='Restoring…';
+  try{
+    // 1. Fetch seasonMatches subcollection for each player
+    const playerSeasonData=[];
+    for(const p of players){
+      const entry=(p.seasons||[]).find(x=>x.seasonNum===sNum);
+      if(!entry)continue;
+      // Try to load the subcollection document
+      let smSnap=null;
+      try{smSnap=await getDocs(collection(db,'players',p.firestoreId,'seasonMatches'));}catch(e){}
+      let smDoc=null;
+      if(smSnap){smSnap.forEach(d=>{if(d.id===String(sNum))smDoc=d.data();});}
+      playerSeasonData.push({player:p,entry,smDoc});
+    }
+
+    // 2. Build a unified match list from archived seasonMatches data
+    // Each player's smDoc.matches has: {opponent, won, date, oldRating, newRating, delta, matchScore}
+    // We need to reconstruct full match records (both players). We'll dedupe by pairing.
+    // Strategy: collect all matches, group by approximate timestamp+players to dedupe.
+    const rawMatches=[]; // {winnerId, loserId, winnerName, loserName, p1id, p2id, p1name, p2name, date, matchScore, p1oldRating, p1newRating, p1delta, p2oldRating, p2newRating, p2delta, score}
+    const seenPairs=new Set();
+
+    for(const{player,entry,smDoc}of playerSeasonData){
+      if(!smDoc?.matches)continue;
+      const pid=player.firestoreId;
+      for(const m of smDoc.matches){
+        // Find opponent player object
+        const opp=players.find(x=>x.name===m.opponent);
+        if(!opp)continue;
+        const oppId=opp.firestoreId;
+        // Create a stable pair key (sorted ids + date)
+        const dateStr=m.date||'';
+        const pairKey=[pid,oppId].sort().join('|')+'|'+dateStr.slice(0,16); // minute precision
+        if(seenPairs.has(pairKey))continue;
+        seenPairs.add(pairKey);
+        const winnerId=m.won?pid:oppId;
+        const loserId=m.won?oppId:pid;
+        const winnerName=m.won?player.name:opp.name;
+        const loserName=m.won?opp.name:player.name;
+        // Get opponent's perspective from their smDoc
+        const oppData=playerSeasonData.find(x=>x.player.firestoreId===oppId);
+        const oppMatch=oppData?.smDoc?.matches?.find(om=>
+          om.opponent===player.name&&om.date?.slice(0,16)===dateStr?.slice(0,16)
+        );
+        const p1id=pid, p2id=oppId;
+        const p1won=m.won;
+        rawMatches.push({
+          winnerId,loserId,winnerName,loserName,
+          p1id,p2id,p1name:player.name,p2name:opp.name,
+          score:p1won?1:0,
+          matchScore:m.matchScore||oppMatch?.matchScore||null,
+          date:new Date(dateStr),
+          p1oldRating:m.oldRating,p1newRating:m.newRating,p1delta:m.delta,
+          p2oldRating:oppMatch?.oldRating??null,p2newRating:oppMatch?.newRating??null,p2delta:oppMatch?.delta??null,
+          p1newRD:null,p1newSigma:null,p2newRD:null,p2newSigma:null,
+        });
+      }
+    }
+
+    // Sort by date asc
+    rawMatches.sort((a,b)=>a.date-b.date);
+
+    // 3. Delete all current live matches
+    const liveSnap=await getDocs(collection(db,'matches'));
+    await Promise.all(liveSnap.docs.map(d=>deleteDoc(doc(db,'matches',d.id))));
+
+    // 4. Write reconstructed matches back to live matches collection
+    await Promise.all(rawMatches.map(m=>addDoc(collection(db,'matches'),{
+      winnerId:m.winnerId,loserId:m.loserId,winnerName:m.winnerName,loserName:m.loserName,
+      p1id:m.p1id,p2id:m.p2id,p1name:m.p1name,p2name:m.p2name,
+      score:m.score,matchScore:m.matchScore,
+      p1oldRating:m.p1oldRating,p1newRating:m.p1newRating,p1delta:m.p1delta,
+      p2oldRating:m.p2oldRating,p2newRating:m.p2newRating,p2delta:m.p2delta,
+      p1newRD:m.p1newRD,p1newSigma:m.p1newSigma,p2newRD:m.p2newRD,p2newSigma:m.p2newSigma,
+      date:m.date,
+    })));
+
+    // 5. Restore each player's stats from the season entry and remove that season from history
+    await Promise.all(playerSeasonData.map(({player,entry})=>{
+      const newSeasons=(player.seasons||[]).filter(x=>x.seasonNum!==sNum);
+      return updateDoc(doc(db,'players',player.firestoreId),{
+        rating:entry.rating,
+        rd:entry.rd,
+        sigma:entry.sigma||SIGMA_DEFAULT,
+        wins:entry.wins,
+        losses:entry.losses,
+        lastDecayAt:Date.now(),
+        seasons:newSeasons,
+      });
+    }));
+
+    // 6. Roll back season config to this season number (so admin can re-reset it properly)
+    await setDoc(doc(db,'config','season'),{
+      name:sName,
+      deadline:null,
+      seasonNum:sNum,
+    });
+
+    showMsg('restore-msg',`✅ "${sName}" restored! ${rawMatches.length} match(es) recreated for ${playerSeasonData.length} player(s). Season number rolled back to ${sNum}.`);
+    populateRestoreSeasonDropdown();
+  }catch(e){
+    showMsg('restore-msg','Error: '+e.message,true);
+    console.error(e);
+  }finally{
+    btn.disabled=false;btn.textContent='↩ Restore This Season';
+  }
+};
+
+
 function lockMatchForm(locked){
   const btn=document.getElementById('submit-match-btn');
   const panel=document.getElementById('panel-matches');
