@@ -931,7 +931,7 @@ function renderLeaderboard(){
     const lastS=seasons.length?seasons[seasons.length-1]:null;
     const sBadge=lastS?(()=>{const rk=lastS.rank,cls=rk===1?'rank1':rk===2?'rank2':rk===3?'rank3':'rankN',emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';return`<span class="s-badge ${cls}" title="Last season: ${esc(lastS.seasonName||'Season '+lastS.seasonNum)}" style="font-size:.6rem;padding:.12rem .35rem">${emoji}${emoji?'':('#'+rk)}</span>`})():'';
     const no1Since=p.no1Since||null;
-    const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--accent3);margin-left:.5rem;letter-spacing:.04em;line-height:1">👑 0s</span>`:'';
+    const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--accent3);margin-left:.5rem;letter-spacing:.04em;line-height:1;display:inline-block;min-width:12ch;overflow:hidden">👑 0s</span>`:'';
     return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}${no1Tag}</div></td><td><span class="rating-val">${r2(p.rating)}</span></td><td><span class="rd-val">±${r2(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
   }).join('')+(sorted.length>vis.length?`<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
 }
