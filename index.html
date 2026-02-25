@@ -300,7 +300,6 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
   .players-sidebar{width:100%;max-width:100%;}
   .form-card{width:100%;max-width:100%;box-sizing:border-box;}
 }
-
 </style>
 </head>
 <body>
@@ -360,7 +359,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
           <button class="btn" id="add-player-btn" onclick="addPlayer()">Add Player</button>
           <div class="msg" id="player-msg"></div>
           <p style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);margin-top:.65rem;line-height:1.7">
-            New players start at <span style="color:var(--accent)">1500</span> · RD <span style="color:var(--accent)">120</span>.<br>
+            New players start at <span style="color:var(--accent)">1500</span> · RD <span style="color:var(--accent)">120</span> · σ <span style="color:var(--accent)">0.06</span>.<br>
             Tap any player card to add a profile photo &amp; quote.
           </p>
         </div>
@@ -405,9 +404,10 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       </div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.08em;color:var(--text);margin:1.75rem 0 1.1rem">Rating System</div>
       <div class="rules-list">
-        <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">RD</div><div><div class="rule-title">Rating Deviation</div><div class="rule-desc">RD measures how confident the system is in a player's rating. A low RD means the rating is reliable; a high RD means more uncertainty. New players start at RD 120. After enough games, RD can drop below 100 — only then does a player appear on the leaderboard. RD also decreases as you play more matches.</div></div></div>
-        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">⏱ RD</div><div><div class="rule-title">RD Decay (Inactivity)</div><div class="rule-desc">If you stop playing, your RD slowly increases over time — because the system becomes less certain your rating is still accurate. This happens on a configurable timer (default: every 4 hours of inactivity). Each period of inactivity increases RD using the Glicko-2 formula φ* = √(φ² + σ²). RD is capped at 200. If your RD rises above 100 you'll be hidden from the leaderboard until you play again.</div></div></div>
-        <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">G2</div><div><div class="rule-title">Glicko-2 Algorithm</div><div class="rule-desc">Uses Glicko-2, an improvement on ELO. Every match updates both players' ratings based on expected outcome — upsets gain more, expected wins gain less. Starting rating: 1500.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">RD</div><div><div class="rule-title">Rating Deviation</div><div class="rule-desc">RD measures how confident the system is in a player's rating. A low RD means the rating is reliable; a high RD means more uncertainty. New players start at RD 120. After enough games, RD can drop below 100 — only then does a player appear on the leaderboard.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">σ</div><div><div class="rule-title">Volatility (σ)</div><div class="rule-desc">Volatility measures how erratic a player's performance is. A higher σ means results are unpredictable — the system reacts more strongly to upsets. It's updated each match using the full Glicko-2 Illinois algorithm. Starting σ: 0.06. Capped at 0.30.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.7rem">⏱ RD</div><div><div class="rule-title">RD Decay (Inactivity)</div><div class="rule-desc">If you stop playing, your RD slowly increases using your personal volatility: φ* = √(φ² + σ²). This means volatile players decay faster than consistent ones. RD is capped at 200. If RD rises above 100 you'll be hidden from the leaderboard.</div></div></div>
+        <div class="rule-item"><div class="rule-icon" style="font-size:.8rem">G2</div><div><div class="rule-title">Glicko-2 Algorithm</div><div class="rule-desc">Full Glicko-2 implementation including per-player volatility updates via the Illinois root-finding method. Every match updates rating, RD, and volatility based on expected outcome — upsets gain more, expected wins gain less. Starting rating: 1500.</div></div></div>
       </div>
     </div>
   </div>
@@ -419,7 +419,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       <div class="admin-section">
         <div class="admin-stitle">Season Settings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.3);max-width:480px">
-          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Set a season end date. When the deadline passes, you can trigger a season reset — all ratings return to 1500, RD to 120, wins/losses to 0, and a snapshot of final rankings is saved to each player's history.</p>
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Set a season end date. When the deadline passes, you can trigger a season reset — all ratings return to 1500, RD to 120, volatility to 0.06, wins/losses to 0, and a snapshot of final rankings is saved to each player's history.</p>
           <div class="field">
             <label>Season Name</label>
             <input type="text" id="season-name-input" placeholder="e.g. Spring 2025">
@@ -440,7 +440,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       <div class="admin-section">
         <div class="admin-stitle">RD Decay Settings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.15);max-width:480px">
-          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">RD increases each inactive period using the Glicko-2 formula <strong style="color:var(--text)">φ* = √(φ² + σ²)</strong>. Default: 4 hours · Max RD: 200 · Hidden from leaderboard if RD &gt; 100.</p>
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">RD increases each inactive period using each player's personal volatility: <strong style="color:var(--text)">φ* = √(φ² + σ²)</strong>. Volatile players decay faster. Default: 4 hours · Max RD: 200 · Hidden from leaderboard if RD &gt; 100.</p>
           <div id="decay-info" style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);line-height:1.8;padding:.6rem .8rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.9rem">
             Loading current settings…
           </div>
@@ -463,7 +463,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
       <div class="admin-section">
         <div class="admin-stitle">Repair Ratings</div>
         <div class="form-card" style="border-color:rgba(201,160,220,.15);max-width:480px">
-          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Recalculates every player's rating and RD directly from their last stored match result, then applies any accumulated decay since that match. Use this to fix any players whose RD was incorrectly reset.</p>
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Recalculates every player's rating, RD, and volatility directly from their last stored match result, then applies any accumulated decay since that match. Use this to fix any players whose values were incorrectly reset.</p>
           <button class="btn-admin" onclick="repairAllRatings()" style="font-size:.68rem;padding:.65rem 1.2rem">🔧 Repair All Ratings From Match History</button>
           <div class="msg" id="repair-msg" style="margin-top:.65rem"></div>
         </div>
@@ -476,7 +476,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
 
       <div class="admin-section">
         <div class="admin-stitle">Match Log (Delete &amp; Recalculate)</div>
-        <p style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-bottom:.75rem;line-height:1.5">Deleting a match will recalculate all ratings and RD from that point forward, including time-based decay.</p>
+        <p style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-bottom:.75rem;line-height:1.5">Deleting a match will recalculate all ratings, RD, and volatility from that point forward, including time-based decay.</p>
         <div id="admin-matches-list"><div class="loading">Loading</div></div>
       </div>
 
@@ -594,6 +594,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
     <input type="hidden" id="edit-pid">
     <div class="field"><label>Rating</label><input type="number" id="edit-rating" step="0.1"></div>
     <div class="field"><label>RD</label><input type="number" id="edit-rd" step="0.1"></div>
+    <div class="field"><label>Volatility (σ)</label><input type="number" id="edit-sigma" step="0.001" min="0.01" max="0.30"></div>
     <div class="field"><label>Wins</label><input type="number" id="edit-wins" step="1" min="0"></div>
     <div class="field"><label>Losses</label><input type="number" id="edit-losses" step="1" min="0"></div>
     <div style="display:flex;gap:.65rem">
@@ -621,12 +622,141 @@ const db=getFirestore(app);
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let players=[],matches=[],isAdmin=false,curProfileId=null;
-const ADMIN_PW='pppaddle',SIGMA=0.06,RD_MAX=200;
+const ADMIN_PW='pppaddle';
+const RD_MAX=200;
+const SIGMA_DEFAULT=0.06;
+const SIGMA_MAX=0.30;
+// Glicko-2 Illinois algorithm constants
+const TAU=0.5;      // system constant controlling volatility change — smaller = less change
+const EPSILON=0.000001; // convergence tolerance
 
 // Show subtitle on wider screens
 const mq=window.matchMedia('(min-width:520px)');
 const toggleSub=()=>document.getElementById('header-sub-text').style.display=mq.matches?'block':'none';
 mq.addEventListener('change',toggleSub); toggleSub();
+
+// ── FULL GLICKO-2 WITH ILLINOIS VOLATILITY UPDATE ────────────────────────────
+// All math follows the Glicko-2 specification by Mark Glickman (2012)
+// https://www.glicko.net/glicko/glicko2.pdf
+
+const SCALE = 173.7178; // converts between Glicko-1 and Glicko-2 scales
+
+// Convert from Glicko-1 scale to Glicko-2 internal scale
+function toG2(r, rd) {
+  return { mu: (r - 1500) / SCALE, phi: rd / SCALE };
+}
+// Convert from Glicko-2 internal scale back to Glicko-1 scale
+function fromG2(mu, phi) {
+  return { r: mu * SCALE + 1500, rd: phi * SCALE };
+}
+
+// g(φ) — reduces impact of opponents with high RD
+function gPhi(phi) {
+  return 1 / Math.sqrt(1 + 3 * phi * phi / (Math.PI * Math.PI));
+}
+
+// E(μ, μⱼ, φⱼ) — expected score against opponent j
+function E(mu, muj, phij) {
+  return 1 / (1 + Math.exp(-gPhi(phij) * (mu - muj)));
+}
+
+/**
+ * Full Glicko-2 update for a player against a list of opponents in one rating period.
+ * Each opp: { rating, rd, sigma, s } where s=1 win, s=0 loss
+ * Returns: { rating, rd, sigma }
+ */
+function g2Update(player, opps) {
+  const { mu, phi } = toG2(player.rating, player.rd);
+  const sigma = player.sigma || SIGMA_DEFAULT;
+
+  // Step 3: If no games played, only increase RD by volatility (already handled by decay)
+  if (!opps.length) {
+    const phiStar = Math.sqrt(phi * phi + sigma * sigma);
+    const r = fromG2(mu, Math.min(phiStar, RD_MAX / SCALE));
+    return { rating: Math.round(r.r * 10) / 10, rd: Math.round(r.rd * 10) / 10, sigma };
+  }
+
+  // Step 3: compute v (estimated variance) and delta (estimated improvement)
+  let vInv = 0, deltaSum = 0;
+  for (const o of opps) {
+    const { mu: muj, phi: phij } = toG2(o.rating, o.rd);
+    const gj = gPhi(phij);
+    const ej = E(mu, muj, phij);
+    vInv += gj * gj * ej * (1 - ej);
+    deltaSum += gj * (o.s - ej);
+  }
+  const v = 1 / vInv;
+  const delta = v * deltaSum;
+
+  // Step 4: compute new volatility σ' using Illinois algorithm
+  const newSigma = computeNewSigma(sigma, phi, v, delta);
+
+  // Step 5: update phi* (pre-match RD inflated by new volatility)
+  const phiStar = Math.sqrt(phi * phi + newSigma * newSigma);
+
+  // Step 6: compute new phi
+  const phiNew = 1 / Math.sqrt(1 / (phiStar * phiStar) + 1 / v);
+
+  // Step 7: compute new mu
+  const muNew = mu + phiNew * phiNew * deltaSum;
+
+  const r = fromG2(muNew, phiNew);
+  return {
+    rating: Math.round(r.r * 10) / 10,
+    rd: Math.round(Math.min(r.rd, RD_MAX) * 10) / 10,
+    sigma: Math.round(Math.min(newSigma, SIGMA_MAX) * 100000) / 100000
+  };
+}
+
+/**
+ * Illinois algorithm to find new volatility σ'.
+ * Solves for x = ln(σ'²) such that f(x) = 0.
+ * This is the heart of Glicko-2 that was missing before.
+ */
+function computeNewSigma(sigma, phi, v, delta) {
+  const a = Math.log(sigma * sigma);
+  const tau2 = TAU * TAU;
+  const phi2 = phi * phi;
+  const delta2 = delta * delta;
+
+  // f(x) as defined in the Glicko-2 paper
+  function f(x) {
+    const ex = Math.exp(x);
+    const d2 = phi2 + v + ex;
+    return (ex * (delta2 - phi2 - v - ex)) / (2 * d2 * d2) - (x - a) / tau2;
+  }
+
+  // Initialize bracket [A, B] for Illinois method
+  let A = a;
+  let B;
+  if (delta2 > phi2 + v) {
+    B = Math.log(delta2 - phi2 - v);
+  } else {
+    // Find upper bound by halving
+    let k = 1;
+    while (f(a - k * TAU) < 0) k++;
+    B = a - k * TAU;
+  }
+
+  let fA = f(A);
+  let fB = f(B);
+
+  // Illinois root-finding iteration
+  let iterations = 0;
+  while (Math.abs(B - A) > EPSILON && iterations < 500) {
+    const C = A + (A - B) * fA / (fB - fA);
+    const fC = f(C);
+    if (fC * fB <= 0) {
+      A = B; fA = fB;
+    } else {
+      fA = fA / 2; // Illinois modification — halve fA to force convergence
+    }
+    B = C; fB = fC;
+    iterations++;
+  }
+
+  return Math.exp(A / 2);
+}
 
 // ── ADMIN ────────────────────────────────────────────────────────────────────
 window.openAdminLogin=function(){
@@ -668,7 +798,7 @@ onSnapshot(query(collection(db,'matches'),orderBy('date','desc')),snap=>{
 onSnapshot(doc(db,'config','decay'),snap=>{
   if(snap.exists()){
     const d=snap.data();
-    const amt=d.amount||7, unt=d.unit||'days';
+    const amt=d.amount||4, unt=d.unit||'hours';
     document.getElementById('decay-amount').value=amt;
     const sel=document.getElementById('decay-unit');
     if(sel){for(let o of sel.options){if(o.value===unt){o.selected=true;break;}}}
@@ -682,33 +812,29 @@ setInterval(applyDecayLocally,5000);
 function updateDecayInfo(){
   const di=document.getElementById('decay-info');
   if(!di)return;
-  const a=document.getElementById('decay-amount').value||'7';
-  const u=document.getElementById('decay-unit').value||'days';
-  di.textContent=`Decay period: ${a} ${u} · Max RD: 200 · Players hidden if RD > 100`;
+  const a=document.getElementById('decay-amount').value||'4';
+  const u=document.getElementById('decay-unit').value||'hours';
+  di.textContent=`Decay period: ${a} ${u} · Max RD: 200 · Players hidden if RD > 100 · Uses personal σ per player`;
 }
 
 // ── DECAY ────────────────────────────────────────────────────────────────────
 function decayMs(){
-  const a=parseFloat(document.getElementById('decay-amount').value)||7;
-  const u=document.getElementById('decay-unit').value||'days';
+  const a=parseFloat(document.getElementById('decay-amount').value)||4;
+  const u=document.getElementById('decay-unit').value||'hours';
   if(u==='minutes')return a*6e4;
   if(u==='hours')return a*36e5;
   return a*864e5;
 }
-// Global decay epoch: periods are aligned to midnight Jan 1 2025 UTC.
-// Every player decays on the same universal ticks regardless of when they last played.
-// e.g. with 4hr periods: ticks at 12am, 4am, 8am, 12pm, 4pm, 8pm every day.
 const DECAY_EPOCH=new Date('2025-01-01T00:00:00Z').getTime();
 
 function currentDecayPeriod(ms){
-  // Which global tick number are we at right now?
   return Math.floor((Date.now()-DECAY_EPOCH)/ms);
 }
 
 function computeDecay(p){
   const ms=decayMs();
-  // Find the player's most recent match timestamp from in-memory matches array
-  // Use it as a floor — lastDecayAt can never be earlier than the last match
+  // Use the player's personal volatility for decay — more volatile players decay faster
+  const sigma=p.sigma||SIGMA_DEFAULT;
   const pid=p.firestoreId;
   let lastMatchTs=0;
   for(const m of matches){
@@ -717,21 +843,23 @@ function computeDecay(p){
       if(ts>lastMatchTs)lastMatchTs=ts;
     }
   }
-  // basePeriod: use the LATER of lastDecayAt and last match time
-  // so a stale lastDecayAt can never count periods before the last match
   const lastProcessed=Math.max(p.lastDecayAt||DECAY_EPOCH, lastMatchTs||DECAY_EPOCH);
   const basePeriod=Math.floor((lastProcessed-DECAY_EPOCH)/ms);
   const nowPeriod=currentDecayPeriod(ms);
   const per=nowPeriod-basePeriod;
   if(per<=0)return null;
 
-  let phi=p.rd/173.7178,phiMax=RD_MAX/173.7178;
-  for(let i=0;i<per;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
+  // φ* = √(φ² + σ²) — uses player's own sigma, not a fixed constant
+  let phi=p.rd/SCALE, phiMax=RD_MAX/SCALE;
+  for(let i=0;i<per;i++){
+    phi=Math.sqrt(phi*phi+sigma*sigma);
+    if(phi>=phiMax){phi=phiMax;break;}
+  }
 
-  // newLast = timestamp of the most recent completed global tick
   const newLast=DECAY_EPOCH+nowPeriod*ms;
-  return{newRD:Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10,newLast};
+  return{newRD:Math.round(Math.min(phi*SCALE,RD_MAX)*10)/10, newLast};
 }
+
 function applyDecayLocally(){
   const ranked=players.filter(p=>p.rd<=100).sort((a,b)=>b.rating-a.rating);
   const topBefore=ranked[0]||null;
@@ -739,7 +867,6 @@ function applyDecayLocally(){
     const r=computeDecay(p);if(!r)return;
     p.rd=r.newRD;p.lastDecayAt=r.newLast;
     const upd={rd:r.newRD,lastDecayAt:r.newLast};
-    // If this player was #1 and just decayed above RD 100, end their streak
     if(topBefore&&p.firestoreId===topBefore.firestoreId&&r.newRD>100&&p.no1Since){
       const dur=Date.now()-(p.no1Since||Date.now());
       const prev=p.longestNo1Ms||0;
@@ -750,6 +877,7 @@ function applyDecayLocally(){
     updateDoc(doc(db,'players',p.firestoreId),upd).catch(()=>{});
   });
 }
+
 function updateDecayStatus(){
   const el=document.getElementById('decay-status');
   if(!el)return;
@@ -757,7 +885,6 @@ function updateDecayStatus(){
   const a=document.getElementById('decay-amount').value||'4';
   const u=document.getElementById('decay-unit').value||'hours';
   const lbl=a+u.charAt(0).toUpperCase();
-  // Next global tick aligned to epoch
   const nowPeriod=Math.floor((now-DECAY_EPOCH)/ms);
   const nextTick=DECAY_EPOCH+(nowPeriod+1)*ms;
   const diff=nextTick-now;
@@ -777,37 +904,36 @@ window.saveDecay=async function(){
   }catch(e){showMsg('decay-msg','Error: '+e.message,true);}
 };
 
+// Helper: reconstruct a player's state from match history up to (not including) a given point
 function playerStateFromHistory(allMatchesBefore, pid) {
-  let rating=1500, rd=120, wins=0, losses=0, lastMatchAt=null;
+  let rating=1500, rd=120, sigma=SIGMA_DEFAULT, wins=0, losses=0, lastMatchAt=null;
   for(const m of allMatchesBefore){
-    if(m.p1id===pid){rating=m.p1newRating;rd=m.p1newRD;wins++;lastMatchAt=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();}
-    else if(m.p2id===pid){rating=m.p2newRating;rd=m.p2newRD;losses++;lastMatchAt=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();}
+    if(m.p1id===pid){
+      rating=m.p1newRating;
+      rd=m.p1newRD;
+      sigma=m.p1newSigma||SIGMA_DEFAULT;
+      wins++;
+      lastMatchAt=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+    } else if(m.p2id===pid){
+      rating=m.p2newRating;
+      rd=m.p2newRD;
+      sigma=m.p2newSigma||SIGMA_DEFAULT;
+      losses++;
+      lastMatchAt=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
+    }
   }
-  return{rating,rd,wins,losses,lastMatchAt};
+  return{rating,rd,sigma,wins,losses,lastMatchAt};
 }
 
 function applyDecayToPlayer(p, nowMs, periodMs){
   if(!p.lastMatchAt||periodMs<=0)return;
+  const sigma=p.sigma||SIGMA_DEFAULT;
   const periods=Math.floor((nowMs-p.lastMatchAt)/periodMs);
   if(periods<=0)return;
-  let phi=p.rd/173.7178;
-  const phiMax=RD_MAX/173.7178;
-  for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-  p.rd=Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10;
-}
-
-// ── GLICKO-2 ─────────────────────────────────────────────────────────────────
-const toG2=(r,rd)=>({mu:(r-1500)/173.7178,phi:rd/173.7178});
-const frG2=(mu,phi)=>({r:mu*173.7178+1500,rd:phi*173.7178});
-const gFn=phi=>1/Math.sqrt(1+3*phi*phi/(Math.PI*Math.PI));
-const eFn=(mu,mj,pj)=>1/(1+Math.exp(-gFn(pj)*(mu-mj)));
-function g2Update(player,opps){
-  const{mu,phi}=toG2(player.rating,player.rd);
-  if(!opps.length)return{rating:player.rating,rd:Math.min(RD_MAX,Math.sqrt(phi*phi+SIGMA*SIGMA)*173.7178)};
-  let vI=0,ds=0;
-  for(const o of opps){const{mu:mj,phi:pj}=toG2(o.rating,o.rd),gj=gFn(pj),ej=eFn(mu,mj,pj);vI+=gj*gj*ej*(1-ej);ds+=gj*(o.s-ej);}
-  const v=1/vI,ps=Math.sqrt(phi*phi+SIGMA*SIGMA),pn=1/Math.sqrt(1/(ps*ps)+1/v),mn=mu+pn*pn*ds;
-  const r=frG2(mn,pn);return{rating:Math.round(r.r*10)/10,rd:Math.round(r.rd*10)/10};
+  let phi=p.rd/SCALE;
+  const phiMax=RD_MAX/SCALE;
+  for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+sigma*sigma);if(phi>=phiMax){phi=phiMax;break;}}
+  p.rd=Math.round(Math.min(phi*SCALE,RD_MAX)*10)/10;
 }
 
 // ── LEADERBOARD ──────────────────────────────────────────────────────────────
@@ -841,7 +967,14 @@ window.addPlayer=async function(){
   if(!name){showMsg('player-msg','Name required.',true);return;}
   if(players.find(p=>p.name.toLowerCase()===name.toLowerCase())){showMsg('player-msg','Already exists.',true);return;}
   const btn=document.getElementById('add-player-btn');btn.disabled=true;
-  try{await addDoc(collection(db,'players'),{name,rating:1500,rd:120,wins:0,losses:0,lastDecayAt:Date.now(),createdAt:serverTimestamp()});document.getElementById('player-name').value='';showMsg('player-msg',name+' added!');}
+  try{
+    await addDoc(collection(db,'players'),{
+      name, rating:1500, rd:120, sigma:SIGMA_DEFAULT,
+      wins:0, losses:0, lastDecayAt:Date.now(), createdAt:serverTimestamp()
+    });
+    document.getElementById('player-name').value='';
+    showMsg('player-msg',name+' added!');
+  }
   catch(e){showMsg('player-msg','Error: '+e.message,true);}finally{btn.disabled=false;}
 };
 
@@ -849,6 +982,8 @@ function makeCard(p){
   const wr=(p.wins+p.losses)>0?Math.round(p.wins/(p.wins+p.losses)*100):0;
   const wc=wr>=60?'var(--win)':wr>=40?'var(--text)':'var(--loss)';
   const rdH=p.rd>100,rdC=rdH?'var(--loss)':p.rd>80?'var(--accent)':'var(--win)';
+  const sigma=p.sigma||SIGMA_DEFAULT;
+  const sigmaC=sigma>0.15?'var(--loss)':sigma>0.09?'var(--accent)':'var(--win)';
   const{ls,la}=pStats(p.firestoreId),sc=ls>=5?'var(--win)':ls>=3?'var(--accent)':'var(--text)';
   const av=p.photoURL?`<img class="pc-avatar" src="${esc(p.photoURL)}" alt="">`:`<div class="pc-av-ph">${esc(p.name.charAt(0).toUpperCase())}</div>`;
   const seasons=p.seasons||[];
@@ -876,12 +1011,13 @@ function makeCard(p){
       <div class="pc-stat"><span class="pc-stat-l">Record</span><span class="pc-stat-v">${p.wins}W–${p.losses}L</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Win%</span><span class="pc-stat-v" style="color:${wc}">${wr}%</span></div>
       <div class="pc-stat"><span class="pc-stat-l">Streak</span><span class="pc-stat-v" style="color:${sc}">${ls>0?ls+'W':'—'}</span></div>
-      <div class="pc-stat"><span class="pc-stat-l">Longest #1</span><span class="pc-stat-v" style="color:var(--accent3);font-size:.95rem">${(()=>{const vis=[...players].filter(x=>x.rd<=100).sort((a,b)=>b.rating-a.rating);const isTop=vis[0]?.firestoreId===p.firestoreId;const since=p.no1Since||null;return isTop?`<span class="no1-timer" data-since="${since||Date.now()}">👑 —</span>`:fmtDur(p.longestNo1Ms||la);})()}</span></div>
+      <div class="pc-stat"><span class="pc-stat-l">Volatility σ</span><span class="pc-stat-v" style="color:${sigmaC};font-size:.9rem">${sigma.toFixed(4)}</span></div>
     </div>
     <div class="pc-foot"><span class="pc-hint">TAP TO VIEW PROFILE</span></div>
     ${histHtml}
   </div>`;
 }
+
 function renderPlayersList(){
   const sorted=[...players].sort((a,b)=>b.rating-a.rating);
   const html=sorted.length?`<div class="cards-label">ALL PLAYERS (${sorted.length})</div><div class="cards-grid">${sorted.map(makeCard).join('')}</div>`:'<div class="empty">No players yet.</div>';
@@ -905,6 +1041,7 @@ window.showSeasonData=function(sel,dataId){
   el.innerHTML=`<strong>${emoji}${esc(s.seasonName||('Season '+s.seasonNum))}</strong><br>
     Final Rank: <strong style="color:${rk===1?'var(--accent)':rk===2?'#c0c0c0':rk===3?'#cd7f32':'var(--text)'}">#${rk}</strong><br>
     Final Rating: <strong style="color:var(--accent)">${r2(s.rating)}</strong> ±${r2(s.rd)}<br>
+    Volatility σ: <strong>${(s.sigma||SIGMA_DEFAULT).toFixed(4)}</strong><br>
     Record: <strong>${s.wins}W – ${s.losses}L</strong><br>
     Season ended: ${ended}`;
 };
@@ -916,18 +1053,14 @@ function pStats(fid){
   let la=0;
   const all=[...matches].filter(m=>ids.has(m.p1id)&&ids.has(m.p2id)).sort((a,b)=>toTs(a)-toTs(b));
   if(all.length&&players.length>=2){
-    // Track both rating and RD per player so we can check leaderboard eligibility (RD<=100)
     const rs={},rds={};
-    players.forEach(p=>{rs[p.firestoreId]=1500;rds[p.firestoreId]=350;}); // 350=unranked default before first match
-    // Seed everyone at baseline before any matches — replay will build up correct values
-    // Don't seed from p1newRD of first match as those stored values may be stale
+    players.forEach(p=>{rs[p.firestoreId]=1500;rds[p.firestoreId]=350;});
     const seen=new Set();
     all.forEach(m=>{
       if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;seen.add(m.p1id);}
       if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;seen.add(m.p2id);}
     });
     const periodMs=decayMs();
-    // Returns the #1 ranked player among those with RD<=100, or null if nobody qualifies
     const top=()=>{
       let best=null,bestR=-Infinity;
       for(const[id,r] of Object.entries(rs)){if(rds[id]<=100&&r>bestR){bestR=r;best=id;}}
@@ -936,21 +1069,18 @@ function pStats(fid){
     let a1=null,lastTs=null;
     all.forEach(m=>{
       const ts=toTs(m);
-      // Before applying this match's results, check if RD decay since last match
-      // pushed anyone off the leaderboard — if that knocked fid off #1, end streak
       if(lastTs!==null&&periodMs>0){
         const periods=Math.floor((ts-lastTs)/periodMs);
         if(periods>0){
-          // Check if fid was #1 before decay
           const wasFidTop=top()===fid;
-          // Apply decay to all players
           for(const id of Object.keys(rds)){
-            let phi=rds[id]/173.7178;
-            const phiMax=RD_MAX/173.7178;
-            for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-            rds[id]=Math.min(phi*173.7178,RD_MAX);
+            let phi=rds[id]/SCALE;
+            const phiMax=RD_MAX/SCALE;
+            // Use each player's sigma for decay simulation
+            const pSigma=(players.find(x=>x.firestoreId===id)?.sigma)||SIGMA_DEFAULT;
+            for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+pSigma*pSigma);if(phi>=phiMax){phi=phiMax;break;}}
+            rds[id]=Math.min(phi*SCALE,RD_MAX);
           }
-          // If fid was #1 and decay knocked it off leaderboard, end streak at decay point
           if(wasFidTop&&top()!==fid){
             if(a1!==null){la=Math.max(la,lastTs+periods*periodMs-a1);a1=null;}
           }
@@ -958,7 +1088,6 @@ function pStats(fid){
       }
       const pt=top();
       rs[m.p1id]=m.p1newRating;rs[m.p2id]=m.p2newRating;
-      // Use stored newRD from match, falling back to current player doc RD as ground truth
       const p1LiveRd=players.find(x=>x.firestoreId===m.p1id)?.rd;
       const p2LiveRd=players.find(x=>x.firestoreId===m.p2id)?.rd;
       rds[m.p1id]=m.p1newRD??p1LiveRd??rds[m.p1id];
@@ -968,12 +1097,9 @@ function pStats(fid){
       else if(pt!==fid&&nt===fid)a1=ts;
       lastTs=ts;
     });
-    // If still #1 now (with current live RD after live decay)
-    // Use the live player doc RD as the definitive current value (post-repair)
     const livePlayer=players.find(x=>x.firestoreId===fid);
     const liveRd=livePlayer?.rd??rds[fid];
     if(top()===fid&&liveRd<=100&&a1!==null)la=Math.max(la,Date.now()-a1);
-    else if(a1!==null){la=Math.max(la,0);} // streak ended (RD decay or displaced), don't extend
   }
   return{ls,la};
 }
@@ -1051,7 +1177,7 @@ window.saveSeason=async function(){
 };
 
 window.triggerSeasonReset=async function(){
-  if(!confirm(`This will:\n1. Save each player's rank, stats & full match history for this season\n2. Reset ALL ratings to 1500, RD to 120, wins/losses to 0\n3. Clear all matches from the active log\n\nSeason: "${seasonConfig.name||'Current'}"\n\nThis cannot be undone. Continue?`))return;
+  if(!confirm(`This will:\n1. Save each player's rank, stats & full match history for this season\n2. Reset ALL ratings to 1500, RD to 120, volatility to 0.06, wins/losses to 0\n3. Clear all matches from the active log\n\nSeason: "${seasonConfig.name||'Current'}"\n\nThis cannot be undone. Continue?`))return;
   const btn=document.getElementById('reset-season-btn');btn.disabled=true;btn.textContent='Archiving…';
   try{
     const sNum=seasonConfig.seasonNum||1;
@@ -1069,52 +1195,6 @@ window.triggerSeasonReset=async function(){
       const pm=allMatches.filter(m=>m.p1id===pid||m.p2id===pid);
       let ls=0,cs=0;
       pm.forEach(m=>{const w=m.winnerId===pid;w?(cs++,ls=Math.max(ls,cs)):cs=0;});
-      let la=0;
-      if(allMatches.length&&players.length>=2){
-        // Track both rating and RD — only RD<=100 players count for #1
-        const rs={},rds={};
-        players.forEach(p=>{rs[p.firestoreId]=1500;rds[p.firestoreId]=350;});
-        const seen=new Set();
-        allMatches.forEach(m=>{
-          if(!seen.has(m.p1id)){rs[m.p1id]=m.p1oldRating;rds[m.p1id]=m.p1newRD??120;seen.add(m.p1id);}
-          if(!seen.has(m.p2id)){rs[m.p2id]=m.p2oldRating;rds[m.p2id]=m.p2newRD??120;seen.add(m.p2id);}
-        });
-        const periodMs=decayMs();
-        const top=()=>{
-          let best=null,bestR=-Infinity;
-          for(const[id,r] of Object.entries(rs)){if(rds[id]<=100&&r>bestR){bestR=r;best=id;}}
-          return best;
-        };
-        let a1=null,lastTs=null;
-        allMatches.forEach(m=>{
-          const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-          // Apply RD decay between matches — if it knocks pid off leaderboard, end streak
-          if(lastTs!==null&&periodMs>0){
-            const periods=Math.floor((ts-lastTs)/periodMs);
-            if(periods>0){
-              const wasPidTop=top()===pid;
-              for(const id of Object.keys(rds)){
-                let phi=rds[id]/173.7178;
-                const phiMax=RD_MAX/173.7178;
-                for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-                rds[id]=Math.min(phi*173.7178,RD_MAX);
-              }
-              if(wasPidTop&&top()!==pid){
-                if(a1!==null){la=Math.max(la,lastTs+periods*periodMs-a1);a1=null;}
-              }
-            }
-          }
-          const pt=top();
-          rs[m.p1id]=m.p1newRating;rs[m.p2id]=m.p2newRating;
-          rds[m.p1id]=m.p1newRD??rds[m.p1id];rds[m.p2id]=m.p2newRD??rds[m.p2id];
-          const nt=top();
-          if(pt===pid&&nt!==pid){if(a1!==null){la=Math.max(la,ts-a1);a1=null;}}
-          else if(pt!==pid&&nt===pid)a1=ts;
-          lastTs=ts;
-        });
-        const endTs=endedAt?new Date(endedAt).getTime():Date.now();
-        if(top()===pid&&rds[pid]<=100&&a1!==null)la=Math.max(la,endTs-a1);
-      }
       const sorted=pm.slice().sort((a,b)=>(a.date?.toDate?a.date.toDate():new Date(a.date))-(b.date?.toDate?b.date.toDate():new Date(b.date)));
       const chartPts=[];
       if(sorted.length){
@@ -1125,12 +1205,12 @@ window.triggerSeasonReset=async function(){
           chartPts.push({rating:i1?m.p1newRating:m.p2newRating,won:m.winnerId===pid,label:i1?m.p2name:m.p1name,date:ts.toISOString()});
         });
       }
-      return{ls,la,chartPts};
+      return{ls,chartPts};
     }
 
     await Promise.all(players.map(async p=>{
       const pid=p.firestoreId;
-      const{ls,la,chartPts}=computeSeasonStats(pid);
+      const{ls,chartPts}=computeSeasonStats(pid);
       const myMatches=allMatches
         .filter(m=>m.p1id===pid||m.p2id===pid)
         .map(m=>({
@@ -1147,19 +1227,22 @@ window.triggerSeasonReset=async function(){
         matches:myMatches,
         chartPts,
         longestWinStreak:ls,
-        longestNo1Ms:la,
       });
       const existing=p.seasons||[];
-      const entry={seasonNum:sNum,seasonName:sName,rank:rankMap[pid],rating:p.rating,rd:p.rd,wins:p.wins,losses:p.losses,endedAt,longestWinStreak:ls,longestNo1Ms:la};
+      const entry={
+        seasonNum:sNum,seasonName:sName,rank:rankMap[pid],
+        rating:p.rating,rd:p.rd,sigma:p.sigma||SIGMA_DEFAULT,
+        wins:p.wins,losses:p.losses,endedAt,longestWinStreak:ls
+      };
       return updateDoc(doc(db,'players',pid),{
-        rating:1500,rd:120,wins:0,losses:0,lastDecayAt:Date.now(),
+        rating:1500,rd:120,sigma:SIGMA_DEFAULT,wins:0,losses:0,lastDecayAt:Date.now(),
         seasons:[...existing,entry]
       });
     }));
 
     await Promise.all(matchesSnap.docs.map(d=>deleteDoc(doc(db,'matches',d.id))));
     await setDoc(doc(db,'config','season'),{name:'',deadline:null,seasonNum:sNum+1});
-    showMsg('season-msg',`Season "${sName}" archived with full match history! All stats reset.`);
+    showMsg('season-msg',`Season "${sName}" archived! All stats reset.`);
   }catch(e){showMsg('season-msg','Error: '+e.message,true);}
   finally{btn.disabled=false;btn.textContent='⚡ Reset Season Now';}
 };
@@ -1193,55 +1276,84 @@ window.submitMatch=async function(){
   const wid=document.getElementById('match-winner').value,lid=document.getElementById('match-loser').value;
   if(wid===lid){showMsg('match-msg','Select two different players.',true);return;}
   const btn=document.getElementById('submit-match-btn');btn.disabled=true;showMsg('match-msg','Submitting…');
-  try{await runTransaction(db,async tx=>{
-    const[ws,ls]=await Promise.all([tx.get(doc(db,'players',wid)),tx.get(doc(db,'players',lid))]);
-    if(!ws.exists()||!ls.exists())throw new Error('Player not found');
-    const w=ws.data(),l=ls.data();
-    const uw=g2Update(w,[{rating:l.rating,rd:l.rd,s:1}]),ul=g2Update(l,[{rating:w.rating,rd:w.rd,s:0}]);
-    const now=Date.now();
-    // Determine current #1 before and after this match
-    const allSnap=await getDocs(query(collection(db,'players')));
-    const allP=allSnap.docs.map(d=>({id:d.id,...d.data()}));
-    const ranked=p=>p.rd<=100;
-    const topBefore=allP.filter(ranked).sort((a,b)=>b.rating-a.rating)[0];
-    // Simulate post-match ratings to find new #1
-    const simP=allP.map(p=>{
-      if(p.id===wid)return{...p,rating:uw.rating,rd:uw.rd};
-      if(p.id===lid)return{...p,rating:ul.rating,rd:ul.rd};
-      return p;
-    });
-    const topAfter=simP.filter(ranked).sort((a,b)=>b.rating-a.rating)[0];
-    const wUpdate={rating:uw.rating,rd:uw.rd,wins:w.wins+1};
-    const lUpdate={rating:ul.rating,rd:ul.rd,losses:l.losses+1};
-    // If #1 changed, finalize old #1 streak and start new one
-    if(topBefore?.id!==topAfter?.id){
-      if(topBefore){
-        const oldTop=allP.find(p=>p.id===topBefore.id);
-        if(oldTop?.no1Since){
-          const dur=now-(oldTop.no1Since||now);
-          const prev=oldTop.longestNo1Ms||0;
-          const upd={no1Since:null};
-          if(dur>prev)upd.longestNo1Ms=dur;
-          if(oldTop.id===wid)Object.assign(wUpdate,upd);
-          else if(oldTop.id===lid)Object.assign(lUpdate,upd);
-          else await tx.update(doc(db,'players',oldTop.id),upd);
+  try{
+    await runTransaction(db,async tx=>{
+      const[ws,ls]=await Promise.all([tx.get(doc(db,'players',wid)),tx.get(doc(db,'players',lid))]);
+      if(!ws.exists()||!ls.exists())throw new Error('Player not found');
+      const w=ws.data(),l=ls.data();
+
+      // Full Glicko-2 update — each player gets opponent's current sigma too
+      const uw=g2Update(
+        {rating:w.rating, rd:w.rd, sigma:w.sigma||SIGMA_DEFAULT},
+        [{rating:l.rating, rd:l.rd, sigma:l.sigma||SIGMA_DEFAULT, s:1}]
+      );
+      const ul=g2Update(
+        {rating:l.rating, rd:l.rd, sigma:l.sigma||SIGMA_DEFAULT},
+        [{rating:w.rating, rd:w.rd, sigma:w.sigma||SIGMA_DEFAULT, s:0}]
+      );
+
+      const now=Date.now();
+      const allSnap=await getDocs(query(collection(db,'players')));
+      const allP=allSnap.docs.map(d=>({id:d.id,...d.data()}));
+      const ranked=p=>p.rd<=100;
+      const topBefore=allP.filter(ranked).sort((a,b)=>b.rating-a.rating)[0];
+      const simP=allP.map(p=>{
+        if(p.id===wid)return{...p,rating:uw.rating,rd:uw.rd};
+        if(p.id===lid)return{...p,rating:ul.rating,rd:ul.rd};
+        return p;
+      });
+      const topAfter=simP.filter(ranked).sort((a,b)=>b.rating-a.rating)[0];
+
+      const wUpdate={rating:uw.rating,rd:uw.rd,sigma:uw.sigma,wins:w.wins+1};
+      const lUpdate={rating:ul.rating,rd:ul.rd,sigma:ul.sigma,losses:l.losses+1};
+
+      if(topBefore?.id!==topAfter?.id){
+        if(topBefore){
+          const oldTop=allP.find(p=>p.id===topBefore.id);
+          if(oldTop?.no1Since){
+            const dur=now-(oldTop.no1Since||now);
+            const prev=oldTop.longestNo1Ms||0;
+            const upd={no1Since:null};
+            if(dur>prev)upd.longestNo1Ms=dur;
+            if(oldTop.id===wid)Object.assign(wUpdate,upd);
+            else if(oldTop.id===lid)Object.assign(lUpdate,upd);
+            else await tx.update(doc(db,'players',oldTop.id),upd);
+          }
+        }
+        if(topAfter){
+          const newTopData=allP.find(p=>p.id===topAfter.id);
+          const no1Since=newTopData?.no1Since||now;
+          if(topAfter.id===wid)wUpdate.no1Since=no1Since;
+          else if(topAfter.id===lid)lUpdate.no1Since=no1Since;
+          else await tx.update(doc(db,'players',topAfter.id),{no1Since});
         }
       }
-      if(topAfter){
-        const newTopData=allP.find(p=>p.id===topAfter.id);
-        const no1Since=newTopData?.no1Since||now;
-        if(topAfter.id===wid)wUpdate.no1Since=no1Since;
-        else if(topAfter.id===lid)lUpdate.no1Since=no1Since;
-        else await tx.update(doc(db,'players',topAfter.id),{no1Since});
-      }
-    }
-    tx.update(doc(db,'players',wid),wUpdate);
-    tx.update(doc(db,'players',lid),lUpdate);
-    const sc=document.getElementById('match-score').value.trim();
-    tx.set(doc(collection(db,'matches')),{winnerId:wid,loserId:lid,winnerName:w.name,loserName:l.name,p1id:wid,p2id:lid,p1name:w.name,p2name:l.name,score:1,matchScore:sc||null,p1delta:Math.round((uw.rating-w.rating)*10)/10,p2delta:Math.round((ul.rating-l.rating)*10)/10,p1newRD:uw.rd,p2newRD:ul.rd,p1oldRating:w.rating,p1newRating:uw.rating,p2oldRating:l.rating,p2newRating:ul.rating,date:serverTimestamp()});
-  });document.getElementById('match-score').value='';const wn=players.find(p=>p.firestoreId===wid);showMsg('match-msg',(wn?.name||'Winner')+' wins!');}
-  catch(e){showMsg('match-msg','Error: '+e.message,true);}finally{btn.disabled=false;}
+
+      tx.update(doc(db,'players',wid),wUpdate);
+      tx.update(doc(db,'players',lid),lUpdate);
+
+      const sc=document.getElementById('match-score').value.trim();
+      tx.set(doc(collection(db,'matches')),{
+        winnerId:wid,loserId:lid,winnerName:w.name,loserName:l.name,
+        p1id:wid,p2id:lid,p1name:w.name,p2name:l.name,score:1,
+        matchScore:sc||null,
+        p1delta:Math.round((uw.rating-w.rating)*10)/10,
+        p2delta:Math.round((ul.rating-l.rating)*10)/10,
+        p1newRD:uw.rd,p2newRD:ul.rd,
+        p1newSigma:uw.sigma,p2newSigma:ul.sigma,
+        p1oldRating:w.rating,p1newRating:uw.rating,
+        p2oldRating:l.rating,p2newRating:ul.rating,
+        date:serverTimestamp()
+      });
+    });
+    document.getElementById('match-score').value='';
+    const wn=players.find(p=>p.firestoreId===wid);
+    showMsg('match-msg',(wn?.name||'Winner')+' wins!');
+  }
+  catch(e){showMsg('match-msg','Error: '+e.message,true);}
+  finally{btn.disabled=false;}
 };
+
 function renderMatchSelects(){
   const opts=players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)} (${r2(p.rating)})</option>`).join('');
   document.getElementById('match-winner').innerHTML=opts||'<option disabled>No players yet</option>';
@@ -1263,10 +1375,12 @@ window.renderHistory=function(){
     const ts=m.date?.toDate?m.date.toDate():new Date(m.date);
     const ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),ti=ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     const d1=(m.p1delta>=0?'+':'')+m.p1delta,d2=(m.p2delta>=0?'+':'')+m.p2delta;
+    const s1=m.p1newSigma?` σ:${m.p1newSigma.toFixed(4)}`:'';
+    const s2=m.p2newSigma?` σ:${m.p2newSigma.toFixed(4)}`:'';
     return`<div class="match-row">
-      <div class="match-player"><span class="name">${esc(m.p1name)}</span><span class="delta ${m.p1delta>=0?'pos':'neg'}">${d1} (${r2(m.p1oldRating)}→${r2(m.p1newRating)})</span><span class="rdi">RD:±${r2(m.p1newRD)}</span></div>
+      <div class="match-player"><span class="name">${esc(m.p1name)}</span><span class="delta ${m.p1delta>=0?'pos':'neg'}">${d1} (${r2(m.p1oldRating)}→${r2(m.p1newRating)})</span><span class="rdi">RD:±${r2(m.p1newRD)}${s1}</span></div>
       <div class="match-mid"><div class="match-result"><span class="ws">WIN</span>${m.matchScore?`<span class="match-score-lbl">${esc(m.matchScore)}</span>`:'<span style="font-size:.8rem;color:var(--muted)">vs</span>'}<span class="ls">LOSS</span></div></div>
-      <div class="match-player" style="text-align:right"><span class="name">${esc(m.p2name)}</span><span class="delta ${m.p2delta>=0?'pos':'neg'}">${d2} (${r2(m.p2oldRating)}→${r2(m.p2newRating)})</span><span class="rdi">RD:±${r2(m.p2newRD)}</span></div>
+      <div class="match-player" style="text-align:right"><span class="name">${esc(m.p2name)}</span><span class="delta ${m.p2delta>=0?'pos':'neg'}">${d2} (${r2(m.p2oldRating)}→${r2(m.p2newRating)})</span><span class="rdi">RD:±${r2(m.p2newRD)}${s2}</span></div>
       <div class="match-meta-col">${ds} · ${ti}</div>
     </div>`;
   }).join('');
@@ -1279,7 +1393,7 @@ function renderAdminPanel(){
   updateDecayInfo();
   const sorted=[...players].sort((a,b)=>b.rating-a.rating);
   const pl=document.getElementById('admin-players-list');
-  if(pl)pl.innerHTML=sorted.length?sorted.map(p=>`<div class="admin-prow"><span class="admin-pname">${esc(p.name)}</span><span class="admin-prating">${r2(p.rating)} ±${r2(p.rd)}</span><button class="btn-admin" onclick="openEditPlayer('${p.firestoreId}')">Edit Stats</button><button class="btn-danger" onclick="adminRemovePlayer('${p.firestoreId}','${esc(p.name)}')">Remove</button></div>`).join(''):'<div class="empty">No players.</div>';
+  if(pl)pl.innerHTML=sorted.length?sorted.map(p=>`<div class="admin-prow"><span class="admin-pname">${esc(p.name)}</span><span class="admin-prating">${r2(p.rating)} ±${r2(p.rd)} σ:${(p.sigma||SIGMA_DEFAULT).toFixed(4)}</span><button class="btn-admin" onclick="openEditPlayer('${p.firestoreId}')">Edit Stats</button><button class="btn-danger" onclick="adminRemovePlayer('${p.firestoreId}','${esc(p.name)}')">Remove</button></div>`).join(''):'<div class="empty">No players.</div>';
   const ml=document.getElementById('admin-matches-list');
   if(ml)ml.innerHTML=matches.length?matches.slice(0,60).map(m=>{
     const ts=m.date?.toDate?m.date.toDate():new Date(m.date);
@@ -1304,106 +1418,86 @@ window.adminRemoveMatch=async function(fid){
     const matchesBefore=allMatches.slice(0,deletedIdx);
     const matchesAfter=allMatches.slice(deletedIdx+1);
 
-    // Only the two players in the deleted match are directly affected.
-    // We replay ONLY their matches in matchesAfter — all other players and matches are untouched.
     const pid1=deletedMatch.p1id, pid2=deletedMatch.p2id;
-
-    // Reconstruct each affected player's state from stored match history up to (not including) deleted match
     const s1=playerStateFromHistory(matchesBefore,pid1);
     const s2=playerStateFromHistory(matchesBefore,pid2);
 
     if(matchesAfter.length===0){
-      // Nothing after — just rewind both players
       await Promise.all([
-        updateDoc(doc(db,'players',pid1),{rating:s1.rating,rd:s1.rd,wins:s1.wins,losses:s1.losses,lastDecayAt:s1.lastMatchAt||Date.now()}),
-        updateDoc(doc(db,'players',pid2),{rating:s2.rating,rd:s2.rd,wins:s2.wins,losses:s2.losses,lastDecayAt:s2.lastMatchAt||Date.now()}),
+        updateDoc(doc(db,'players',pid1),{rating:s1.rating,rd:s1.rd,sigma:s1.sigma,wins:s1.wins,losses:s1.losses,lastDecayAt:s1.lastMatchAt||Date.now()}),
+        updateDoc(doc(db,'players',pid2),{rating:s2.rating,rd:s2.rd,sigma:s2.sigma,wins:s2.wins,losses:s2.losses,lastDecayAt:s2.lastMatchAt||Date.now()}),
       ]);
       alert('Match deleted. Ratings rewound to previous state.');
       return;
     }
 
-    // Build a state map for just the two affected players
     const periodMs=decayMs();
     const pmap={
       [pid1]:{...s1,firestoreId:pid1},
       [pid2]:{...s2,firestoreId:pid2},
     };
 
-    // Walk matchesAfter in chronological order.
-    // - Matches involving pid1 or pid2: recalculate and rewrite.
-    // - Matches between two other players: read stored opponent ratings/RDs so we know
-    //   what pid1/pid2's opponent was rated at that moment (use stored values — those
-    //   players were unaffected so their stored match data is still correct).
     const matchUpdates=[];
     const playerUpdates={};
 
     for(const m of matchesAfter){
       const involvesP1=m.p1id===pid1||m.p2id===pid1;
       const involvesP2=m.p1id===pid2||m.p2id===pid2;
-      if(!involvesP1&&!involvesP2)continue; // unrelated match — skip entirely
+      if(!involvesP1&&!involvesP2)continue;
 
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      const isWinner1=m.p1id===pid1||m.p1id===pid2; // whichever of our two is p1 (p1 is always winner)
       const ourId=involvesP1?pid1:pid2;
-      const oppId=isWinner1?m.p2id:m.p1id;
       const ourState=pmap[ourId];
 
-      // Apply decay to our player since their last match
       applyDecayToPlayer(ourState,ts,periodMs);
 
-      // Opponent's rating/RD: use stored pre-match values from the match record itself
-      // (they are unaffected, so their stored data is the ground truth)
-      const oppRating=isWinner1?m.p2oldRating:m.p1oldRating;
-      const oppRD=isWinner1?(m.p2newRD??120):(m.p1newRD??120); // their RD at that match (stored)
+      const isWinner=(m.p1id===ourId);
+      const oppRating=isWinner?m.p2oldRating:m.p1oldRating;
+      const oppRD=isWinner?(m.p2newRD??120):(m.p1newRD??120);
+      const oppSigma=isWinner?(m.p2newSigma??SIGMA_DEFAULT):(m.p1newSigma??SIGMA_DEFAULT);
 
-      // Determine if our player won this match
-      const ourPlayerWon=(m.p1id===ourId); // p1 is always winner in stored data
-
-      const newState=g2Update(ourState,[{rating:oppRating,rd:oppRD,s:ourPlayerWon?1:0}]);
+      const newState=g2Update(
+        {rating:ourState.rating, rd:ourState.rd, sigma:ourState.sigma||SIGMA_DEFAULT},
+        [{rating:oppRating, rd:oppRD, sigma:oppSigma, s:isWinner?1:0}]
+      );
       const oldRating=ourState.rating;
       const delta=Math.round((newState.rating-oldRating)*10)/10;
 
-      // Update in-memory state
       pmap[ourId].rating=newState.rating;
       pmap[ourId].rd=newState.rd;
-      if(ourPlayerWon)pmap[ourId].wins=(pmap[ourId].wins||0)+1;
+      pmap[ourId].sigma=newState.sigma;
+      if(isWinner)pmap[ourId].wins=(pmap[ourId].wins||0)+1;
       else pmap[ourId].losses=(pmap[ourId].losses||0)+1;
       pmap[ourId].lastMatchAt=ts;
 
-      // Rewrite just the fields for our player in this match document
       if(m.p1id===ourId){
         matchUpdates.push(updateDoc(doc(db,'matches',m.firestoreId),{
-          p1delta:delta,p1oldRating:oldRating,p1newRating:newState.rating,p1newRD:newState.rd
+          p1delta:delta,p1oldRating:oldRating,p1newRating:newState.rating,p1newRD:newState.rd,p1newSigma:newState.sigma
         }));
       } else {
         matchUpdates.push(updateDoc(doc(db,'matches',m.firestoreId),{
-          p2delta:delta,p2oldRating:oldRating,p2newRating:newState.rating,p2newRD:newState.rd
+          p2delta:delta,p2oldRating:oldRating,p2newRating:newState.rating,p2newRD:newState.rd,p2newSigma:newState.sigma
         }));
       }
       playerUpdates[ourId]=pmap[ourId];
     }
 
-    // Write final player states for only the two affected players
     const writes=Object.values(playerUpdates).map(p=>
       updateDoc(doc(db,'players',p.firestoreId),{
-        rating:p.rating,rd:p.rd,wins:p.wins||0,losses:p.losses||0,lastDecayAt:p.lastMatchAt||Date.now()
+        rating:p.rating,rd:p.rd,sigma:p.sigma||SIGMA_DEFAULT,wins:p.wins||0,losses:p.losses||0,lastDecayAt:p.lastMatchAt||Date.now()
       })
     );
-    // If one of the two players had no matches after either, still rewind them
-    if(!playerUpdates[pid1])writes.push(updateDoc(doc(db,'players',pid1),{rating:s1.rating,rd:s1.rd,wins:s1.wins,losses:s1.losses,lastDecayAt:s1.lastMatchAt||Date.now()}));
-    if(!playerUpdates[pid2])writes.push(updateDoc(doc(db,'players',pid2),{rating:s2.rating,rd:s2.rd,wins:s2.wins,losses:s2.losses,lastDecayAt:s2.lastMatchAt||Date.now()}));
+    if(!playerUpdates[pid1])writes.push(updateDoc(doc(db,'players',pid1),{rating:s1.rating,rd:s1.rd,sigma:s1.sigma,wins:s1.wins,losses:s1.losses,lastDecayAt:s1.lastMatchAt||Date.now()}));
+    if(!playerUpdates[pid2])writes.push(updateDoc(doc(db,'players',pid2),{rating:s2.rating,rd:s2.rd,sigma:s2.sigma,wins:s2.wins,losses:s2.losses,lastDecayAt:s2.lastMatchAt||Date.now()}));
 
     await Promise.all([...writes,...matchUpdates]);
     alert('Match deleted and ratings recalculated from that point forward.');
   }catch(e){alert('Error: '+e.message);console.error(e);}
 };
 
-// ── REPAIR RATINGS FAILSAFE ─────────────────────────────────────────────────
-// Derives each player's true rating+RD purely from their last stored match record
-// (which always has correct p1newRating/p1newRD/p2newRating/p2newRD), then applies
-// decay since that match. Never uses the player doc's current rating/rd as input.
+// ── REPAIR RATINGS ─────────────────────────────────────────────────────────
 window.repairAllRatings=async function(){
-  if(!confirm('Recalculate all ratings and RDs from match history? This will fix any incorrectly reset values.'))return;
+  if(!confirm('Recalculate all ratings, RDs, and volatilities from match history?'))return;
   const btn=document.querySelector('[onclick="repairAllRatings()"]');
   if(btn){btn.disabled=true;btn.textContent='Repairing…';}
   try{
@@ -1412,129 +1506,36 @@ window.repairAllRatings=async function(){
     const now=Date.now();
     const periodMs=decayMs();
 
-    // ── Step 1: RD + rating from last stored match ─────────────────────────
-    // p1newRD/p2newRD on each match are the ground truth post-match values.
+    // Build final state from stored match records
     const lastMatchState={};
     for(const m of allMatches){
       const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      if(!lastMatchState[m.p1id])lastMatchState[m.p1id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};
-      if(!lastMatchState[m.p2id])lastMatchState[m.p2id]={rating:1500,rd:120,wins:0,losses:0,lastMatchAt:null};
-      lastMatchState[m.p1id]={rating:m.p1newRating,rd:m.p1newRD,wins:(lastMatchState[m.p1id].wins||0)+1,losses:lastMatchState[m.p1id].losses||0,lastMatchAt:ts};
-      lastMatchState[m.p2id]={rating:m.p2newRating,rd:m.p2newRD,wins:lastMatchState[m.p2id].wins||0,losses:(lastMatchState[m.p2id].losses||0)+1,lastMatchAt:ts};
+      if(!lastMatchState[m.p1id])lastMatchState[m.p1id]={rating:1500,rd:120,sigma:SIGMA_DEFAULT,wins:0,losses:0,lastMatchAt:null};
+      if(!lastMatchState[m.p2id])lastMatchState[m.p2id]={rating:1500,rd:120,sigma:SIGMA_DEFAULT,wins:0,losses:0,lastMatchAt:null};
+      lastMatchState[m.p1id]={rating:m.p1newRating,rd:m.p1newRD,sigma:m.p1newSigma||SIGMA_DEFAULT,wins:(lastMatchState[m.p1id].wins||0)+1,losses:lastMatchState[m.p1id].losses||0,lastMatchAt:ts};
+      lastMatchState[m.p2id]={rating:m.p2newRating,rd:m.p2newRD,sigma:m.p2newSigma||SIGMA_DEFAULT,wins:lastMatchState[m.p2id].wins||0,losses:(lastMatchState[m.p2id].losses||0)+1,lastMatchAt:ts};
     }
 
     const updates=[];
     for(const p of players){
       const state=lastMatchState[p.firestoreId];
-      if(!state)continue; // never played — skip
-      // Apply epoch-aligned decay since last match — same math as computeDecay
+      if(!state)continue;
+      const sigma=state.sigma||SIGMA_DEFAULT;
       let rd=state.rd;
       if(state.lastMatchAt&&periodMs>0){
         const basePeriod=Math.floor((state.lastMatchAt-DECAY_EPOCH)/periodMs);
         const nowPeriod=Math.floor((now-DECAY_EPOCH)/periodMs);
         const periods=nowPeriod-basePeriod;
         if(periods>0){
-          let phi=rd/173.7178;const phiMax=RD_MAX/173.7178;
-          for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-          rd=Math.round(Math.min(phi*173.7178,RD_MAX)*10)/10;
+          let phi=rd/SCALE;const phiMax=RD_MAX/SCALE;
+          for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+sigma*sigma);if(phi>=phiMax){phi=phiMax;break;}}
+          rd=Math.round(Math.min(phi*SCALE,RD_MAX)*10)/10;
         }
       }
-      // Set lastDecayAt to the current epoch tick so computeDecay won't double-count
       const nowPeriod=Math.floor((now-DECAY_EPOCH)/periodMs);
       const lastDecayAt=DECAY_EPOCH+nowPeriod*periodMs;
       updates.push(updateDoc(doc(db,'players',p.firestoreId),{
-        rating:state.rating,rd,wins:state.wins,losses:state.losses,lastDecayAt
-      }));
-    }
-
-    // ── Step 2: replay match history to find no1Since and longestNo1Ms ──────
-    // Use repaired RDs from lastMatchState (not stale stored m.p1newRD values)
-    // Track ratings and RDs per player, applying epoch-aligned decay between matches
-    const rRs={},rRds={};
-    players.forEach(p=>{rRs[p.firestoreId]=1500;rRds[p.firestoreId]=350;});
-    // Seed each player's state just before their first match from stored oldRating
-    const rSeen=new Set();
-    for(const m of allMatches){
-      if(!rSeen.has(m.p1id)){rRs[m.p1id]=m.p1oldRating;rRds[m.p1id]=350;rSeen.add(m.p1id);}
-      if(!rSeen.has(m.p2id)){rRs[m.p2id]=m.p2oldRating;rRds[m.p2id]=350;rSeen.add(m.p2id);}
-    }
-    const rTop=()=>{let best=null,bestR=-Infinity;for(const[id,r] of Object.entries(rRs)){if(rRds[id]<=100&&r>bestR){bestR=r;best=id;}}return best;};
-    const no1Starts={},longestNo1={};
-    let lastTs=null;
-    // Seed initial #1 before first match
-    if(allMatches.length){
-      const firstTs=allMatches[0].date?.toDate?allMatches[0].date.toDate().getTime():new Date(allMatches[0].date).getTime();
-      const init=rTop();if(init)no1Starts[init]=firstTs;
-    }
-    for(const m of allMatches){
-      const ts=m.date?.toDate?m.date.toDate().getTime():new Date(m.date).getTime();
-      // Epoch-aligned decay between matches
-      if(lastTs!==null&&periodMs>0){
-        const bp=Math.floor((lastTs-DECAY_EPOCH)/periodMs);
-        const np=Math.floor((ts-DECAY_EPOCH)/periodMs);
-        const periods=np-bp;
-        if(periods>0){
-          const wasTop=rTop();
-          for(const id of Object.keys(rRds)){
-            let phi=rRds[id]/173.7178;const phiMax=RD_MAX/173.7178;
-            for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-            rRds[id]=Math.min(phi*173.7178,RD_MAX);
-          }
-          const nowTop=rTop();
-          if(wasTop!==nowTop){
-            if(wasTop&&no1Starts[wasTop]!=null){longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,DECAY_EPOCH+(np)*periodMs-no1Starts[wasTop]);delete no1Starts[wasTop];}
-            if(nowTop&&no1Starts[nowTop]==null)no1Starts[nowTop]=DECAY_EPOCH+np*periodMs;
-          }
-        }
-      }
-      const pt=rTop();
-      // Use repaired post-match RDs from lastMatchState, not stale stored values
-      rRs[m.p1id]=m.p1newRating;rRs[m.p2id]=m.p2newRating;
-      rRds[m.p1id]=lastMatchState[m.p1id]?.rd??m.p1newRD??rRds[m.p1id];
-      rRds[m.p2id]=lastMatchState[m.p2id]?.rd??m.p2newRD??rRds[m.p2id];
-      // But only use repaired RD if this IS the last match for that player
-      // (otherwise use stored match RD for intermediate matches)
-      rRds[m.p1id]=m.p1newRD??rRds[m.p1id];
-      rRds[m.p2id]=m.p2newRD??rRds[m.p2id];
-      const nt=rTop();
-      if(pt!==nt){
-        if(pt&&no1Starts[pt]!=null){longestNo1[pt]=Math.max(longestNo1[pt]||0,ts-no1Starts[pt]);delete no1Starts[pt];}
-        if(nt&&no1Starts[nt]==null)no1Starts[nt]=ts;
-      }
-      lastTs=ts;
-    }
-    // Apply decay from last match to now, check if current #1 decayed off
-    if(lastTs!==null&&periodMs>0){
-      const bp=Math.floor((lastTs-DECAY_EPOCH)/periodMs);
-      const np=Math.floor((now-DECAY_EPOCH)/periodMs);
-      const periods=np-bp;
-      if(periods>0){
-        const wasTop=rTop();
-        for(const id of Object.keys(rRds)){
-          let phi=rRds[id]/173.7178;const phiMax=RD_MAX/173.7178;
-          for(let i=0;i<periods;i++){phi=Math.sqrt(phi*phi+SIGMA*SIGMA);if(phi>=phiMax){phi=phiMax;break;}}
-          rRds[id]=Math.min(phi*173.7178,RD_MAX);
-        }
-        const nowTop=rTop();
-        if(wasTop!==nowTop){
-          if(wasTop&&no1Starts[wasTop]!=null){longestNo1[wasTop]=Math.max(longestNo1[wasTop]||0,DECAY_EPOCH+np*periodMs-no1Starts[wasTop]);delete no1Starts[wasTop];}
-          if(nowTop&&no1Starts[nowTop]==null)no1Starts[nowTop]=DECAY_EPOCH+np*periodMs;
-        }
-      }
-    }
-    const currentTop=rTop();
-    // Finalize streaks for anyone who is no longer #1
-    for(const[pid,since] of Object.entries({...no1Starts})){
-      if(pid!==currentTop){longestNo1[pid]=Math.max(longestNo1[pid]||0,now-since);delete no1Starts[pid];}
-    }
-    // Write no1Since and longestNo1Ms for all players
-    for(const p of players){
-      const isTop=p.firestoreId===currentTop&&rRds[p.firestoreId]<=100;
-      const no1Since=isTop?(no1Starts[p.firestoreId]||null):null;
-      const longestMs=longestNo1[p.firestoreId]||0;
-      updates.push(updateDoc(doc(db,'players',p.firestoreId),{
-        no1Since:no1Since,
-        longestNo1Ms:longestMs
+        rating:state.rating,rd,sigma,wins:state.wins,losses:state.losses,lastDecayAt
       }));
     }
 
@@ -1552,15 +1553,26 @@ window.openEditPlayer=function(fid){
   document.getElementById('edit-pid').value=fid;
   document.getElementById('edit-rating').value=Math.round(p.rating);
   document.getElementById('edit-rd').value=Math.round(p.rd);
+  document.getElementById('edit-sigma').value=(p.sigma||SIGMA_DEFAULT).toFixed(5);
   document.getElementById('edit-wins').value=p.wins;
   document.getElementById('edit-losses').value=p.losses;
   document.getElementById('edit-player-msg').style.display='none';
   document.getElementById('admin-edit-overlay').classList.add('open');
 };
 window.submitEditPlayer=async function(){
-  const fid=document.getElementById('edit-pid').value,rating=parseFloat(document.getElementById('edit-rating').value),rd=parseFloat(document.getElementById('edit-rd').value),wins=parseInt(document.getElementById('edit-wins').value),losses=parseInt(document.getElementById('edit-losses').value);
-  if([rating,rd,wins,losses].some(isNaN)){showMsg('edit-player-msg','Invalid values.',true);return;}
-  try{await updateDoc(doc(db,'players',fid),{rating,rd,wins,losses});showMsg('edit-player-msg','Saved!');setTimeout(()=>document.getElementById('admin-edit-overlay').classList.remove('open'),1200);}
+  const fid=document.getElementById('edit-pid').value;
+  const rating=parseFloat(document.getElementById('edit-rating').value);
+  const rd=parseFloat(document.getElementById('edit-rd').value);
+  const sigma=parseFloat(document.getElementById('edit-sigma').value);
+  const wins=parseInt(document.getElementById('edit-wins').value);
+  const losses=parseInt(document.getElementById('edit-losses').value);
+  if([rating,rd,sigma,wins,losses].some(isNaN)){showMsg('edit-player-msg','Invalid values.',true);return;}
+  if(sigma<0.001||sigma>SIGMA_MAX){showMsg('edit-player-msg',`Volatility must be between 0.001 and ${SIGMA_MAX}.`,true);return;}
+  try{
+    await updateDoc(doc(db,'players',fid),{rating,rd,sigma,wins,losses});
+    showMsg('edit-player-msg','Saved!');
+    setTimeout(()=>document.getElementById('admin-edit-overlay').classList.remove('open'),1200);
+  }
   catch(e){showMsg('edit-player-msg','Error: '+e.message,true);}
 };
 
@@ -1718,6 +1730,8 @@ window.openProfile=async function(fid){
   if(p.quote){qEl.innerHTML=`"${esc(p.quote)}" <span class="qa">— ${esc(p.name)}</span>`;qEl.style.display='block';}else qEl.style.display='none';
   const wr=(p.wins+p.losses)>0?Math.round(p.wins/(p.wins+p.losses)*100):0,wc=wr>=60?'green':wr>=40?'neutral':'red';
   const{ls,la}=pStats(fid);
+  const sigma=p.sigma||SIGMA_DEFAULT;
+
   function renderProfileStats(){
     const liveP=players.find(x=>x.firestoreId===fid)||p;
     const vis=[...players].filter(x=>x.rd<=100).sort((a,b)=>b.rating-a.rating);
@@ -1727,9 +1741,12 @@ window.openProfile=async function(fid){
       :isTop
         ?`<span class="no1-timer counting" data-since="${Date.now()}">👑 —</span>`
         :fmtDur(liveP.longestNo1Ms||la);
+    const liveSigma=(liveP.sigma||SIGMA_DEFAULT).toFixed(4);
+    const sigC=(liveP.sigma||SIGMA_DEFAULT)>0.15?'red':(liveP.sigma||SIGMA_DEFAULT)>0.09?'':'neutral';
     document.getElementById('profile-stats').innerHTML=`
     <div class="m-stat"><span class="m-stat-l">Rating</span><span class="m-stat-v">${r2(liveP.rating)}</span></div>
     <div class="m-stat"><span class="m-stat-l">RD</span><span class="m-stat-v neutral">±${r2(liveP.rd)}</span></div>
+    <div class="m-stat"><span class="m-stat-l">Volatility σ</span><span class="m-stat-v ${sigC}" style="font-size:1rem">${liveSigma}</span></div>
     <div class="m-stat"><span class="m-stat-l">Record</span><span class="m-stat-v neutral">${liveP.wins}W–${liveP.losses}L</span></div>
     <div class="m-stat"><span class="m-stat-l">Win%</span><span class="m-stat-v ${wc}">${wr}%</span></div>
     <div class="m-stat"><span class="m-stat-l">Streak</span><span class="m-stat-v ${ls>=5?'green':ls>=3?'':'neutral'}">${ls>0?ls+'W':'—'}</span></div>
@@ -1748,7 +1765,9 @@ window.openProfile=async function(fid){
     return pm.length?[...pm].reverse().map(m=>{
       const i1=m.p1id===fid,won=i1?m.score===1:m.score===0,opp=i1?m.p2name:m.p1name,delta=i1?m.p1delta:m.p2delta,oldR=i1?m.p1oldRating:m.p2oldRating,newR=i1?m.p1newRating:m.p2newRating;
       const ts=m.date?.toDate?m.date.toDate():new Date(m.date),ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),ti=ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),df=(delta>=0?'+':'')+delta;
-      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds} · ${ti}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}<br><span style="font-size:.6rem;color:var(--muted)">${r2(oldR)}→${r2(newR)}</span></span></div>`;
+      const newSig=i1?(m.p1newSigma):(m.p2newSigma);
+      const sigStr=newSig?` <span style="color:var(--muted);font-size:.55rem">σ:${newSig.toFixed(4)}</span>`:'';
+      return`<div class="pm-row"><span class="pm-badge ${won?'win':'loss'}">${won?'WIN':'LOSS'}</span><div class="pm-info"><span class="pm-opp">vs ${esc(opp)}${m.matchScore?' <span style="font-family:\'DM Mono\',monospace;font-size:.58rem;color:var(--muted)">'+esc(m.matchScore)+'</span>':''}</span><span class="pm-date">${ds} · ${ti}</span></div><span class="pm-delta ${delta>=0?'pos':'neg'}">${df}${sigStr}<br><span style="font-size:.6rem;color:var(--muted)">${r2(oldR)}→${r2(newR)}</span></span></div>`;
     }).join(''):'<div class="empty">No matches this season yet.</div>';
   }
 
@@ -1807,9 +1826,9 @@ window.loadProfileSeason=async function(fid,val){
       const emoji=sEntry.rank===1?'🥇':sEntry.rank===2?'🥈':sEntry.rank===3?'🥉':'';
       const ended=sEntry.endedAt?new Date(sEntry.endedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
       const streakHtml=sEntry.longestWinStreak>0?` · Best streak <strong style="color:var(--win)">${sEntry.longestWinStreak}W</strong>`:'';
-      const no1Html=sEntry.longestNo1Ms>0?` · Longest #1 <strong style="color:var(--accent3)">${fmtDur(sEntry.longestNo1Ms)}</strong>`:'';
+      const sigmaHtml=sEntry.sigma?` · σ: <strong>${sEntry.sigma.toFixed(4)}</strong>`:'';
       headerHtml=`<div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);padding:.55rem .75rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.65rem;line-height:1.8">
-        ${emoji} <strong style="color:var(--text)">${esc(sEntry.seasonName||'Season '+sEntry.seasonNum)}</strong> · Final rank <strong style="color:var(--accent)">#${sEntry.rank}</strong> · ${sEntry.wins}W–${sEntry.losses}L · Rating <strong style="color:var(--accent)">${r2(sEntry.rating)}</strong>${streakHtml}${no1Html}${ended?' · Ended '+ended:''}
+        ${emoji} <strong style="color:var(--text)">${esc(sEntry.seasonName||'Season '+sEntry.seasonNum)}</strong> · Final rank <strong style="color:var(--accent)">#${sEntry.rank}</strong> · ${sEntry.wins}W–${sEntry.losses}L · Rating <strong style="color:var(--accent)">${r2(sEntry.rating)}</strong>${sigmaHtml}${streakHtml}${ended?' · Ended '+ended:''}
       </div>`;
     }
     if(!ms.length){el.innerHTML=headerHtml+'<div class="empty">No matches recorded for this season.</div>';return;}
@@ -1863,14 +1882,8 @@ function drawChart(points){
 
 // ── PONG ─────────────────────────────────────────────────────────────────────
 let pongRaf=null,pongRunning=false,pongInited=false;
-const PONG={
-  W:600,H:400,PAD_W:10,PAD_H:70,BALL:8,
-  BASE_SPEED:5,
-  state:null
-};
+const PONG={W:600,H:400,PAD_W:10,PAD_H:70,BALL:8,BASE_SPEED:5,state:null};
 
-// ── NAV ──────────────────────────────────────────────────────────────────────
-// IMPORTANT: showPanel must be defined BEFORE initPong so the pong tab switch works correctly
 window.showPanel=function(id,btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
@@ -1879,7 +1892,6 @@ window.showPanel=function(id,btn){
   if(id==='players')renderPlayersList();
   if(id==='history')renderHistory();
   if(id==='admin')renderAdminPanel();
-  // Stop pong when leaving tab
   if(id!=='pong'&&pongRunning){pongRunning=false;if(pongRaf)cancelAnimationFrame(pongRaf);}
   if(id==='pong')initPong();
 };
@@ -1888,17 +1900,12 @@ function initPong(){
   if(pongInited)return;
   pongInited=true;
   const canvas=document.getElementById('pong-canvas');
-
-  // Mouse — correct scale: multiply by (logical size / CSS rendered size)
   canvas.addEventListener('mousemove',e=>{
     if(!pongRunning||!PONG.state)return;
     const rect=canvas.getBoundingClientRect();
-    // Canvas logical height is PONG.H=400, CSS rendered height is rect.height
     const y=(e.clientY-rect.top)*(PONG.H/rect.height);
     PONG.state.playerY=Math.max(PONG.PAD_H/2,Math.min(PONG.H-PONG.PAD_H/2,y));
   });
-
-  // Touch — same corrected scaling
   canvas.addEventListener('touchmove',e=>{
     if(!pongRunning||!PONG.state)return;
     e.preventDefault();
@@ -1906,51 +1913,32 @@ function initPong(){
     const y=(e.touches[0].clientY-rect.top)*(PONG.H/rect.height);
     PONG.state.playerY=Math.max(PONG.PAD_H/2,Math.min(PONG.H-PONG.PAD_H/2,y));
   },{passive:false});
-
-  // Keyboard — track held keys for smooth movement, speed scales with ball speed
   const keysHeld=new Set();
   window.addEventListener('keydown',e=>{
-    // Only prevent scroll if pong tab is active
     if(pongRunning&&(e.key==='ArrowUp'||e.key==='ArrowDown'))e.preventDefault();
     keysHeld.add(e.key);
   });
   window.addEventListener('keyup',e=>keysHeld.delete(e.key));
-
-  // Apply keyboard input at ~60fps, independent of rAF loop
   setInterval(()=>{
     if(!pongRunning||!PONG.state)return;
-    // Step size scales a bit with speed so you can keep up at high velocities
     const step=Math.max(14,PONG.state.speed*1.6);
     if(keysHeld.has('ArrowUp')||keysHeld.has('w')||keysHeld.has('W'))
       PONG.state.playerY=Math.max(PONG.PAD_H/2,PONG.state.playerY-step);
     if(keysHeld.has('ArrowDown')||keysHeld.has('s')||keysHeld.has('S'))
       PONG.state.playerY=Math.min(PONG.H-PONG.PAD_H/2,PONG.state.playerY+step);
   },16);
-
-  // Click/tap overlay to start
   document.getElementById('pong-overlay').addEventListener('click',()=>{if(!pongRunning)startPong();});
 }
 
 function resetBall(dir=1){
   const angle=(Math.random()*60-30)*(Math.PI/180);
   const spd=PONG.state.speed;
-  return{
-    x:PONG.W/2,y:PONG.H/2,
-    vx:Math.cos(angle)*spd*dir,
-    vy:Math.sin(angle)*spd
-  };
+  return{x:PONG.W/2,y:PONG.H/2,vx:Math.cos(angle)*spd*dir,vy:Math.sin(angle)*spd};
 }
 
 window.startPong=function(){
   if(pongRaf)cancelAnimationFrame(pongRaf);
-  PONG.state={
-    playerY:PONG.H/2,
-    cpuY:PONG.H/2,
-    scorePlayer:0,scoreCpu:0,
-    speed:PONG.BASE_SPEED,
-    totalPoints:0,
-    flash:0,
-  };
+  PONG.state={playerY:PONG.H/2,cpuY:PONG.H/2,scorePlayer:0,scoreCpu:0,speed:PONG.BASE_SPEED,totalPoints:0,flash:0};
   Object.assign(PONG.state,{ball:resetBall(1)});
   document.getElementById('pong-overlay').style.display='none';
   pongRunning=true;
@@ -1963,89 +1951,49 @@ function pongLoop(){
   const s=PONG.state;
   const{W,H,PAD_W,PAD_H,BALL}=PONG;
   const b=s.ball;
-
-  // CPU AI
   const cpuSpeed=3+s.speed*0.35;
   if(b.x>W*0.5){
     if(s.cpuY<b.y-8)s.cpuY=Math.min(s.cpuY+cpuSpeed,H-PAD_H/2);
     else if(s.cpuY>b.y+8)s.cpuY=Math.max(s.cpuY-cpuSpeed,PAD_H/2);
   }
-
-  // Move ball
   b.x+=b.vx;b.y+=b.vy;
-
-  // Wall bounce
   if(b.y-BALL<0){b.y=BALL;b.vy=Math.abs(b.vy);}
   if(b.y+BALL>H){b.y=H-BALL;b.vy=-Math.abs(b.vy);}
-
-  // Player paddle (left)
   const px=PAD_W+4;
   if(b.vx<0&&b.x-BALL<=px+PAD_W&&b.x+BALL>=px&&b.y>=s.playerY-PAD_H/2&&b.y<=s.playerY+PAD_H/2){
     b.x=px+PAD_W+BALL;
     const rel=(b.y-s.playerY)/(PAD_H/2);
     const angle=rel*65*(Math.PI/180);
-    b.vx=Math.cos(angle)*s.speed;
-    b.vy=Math.sin(angle)*s.speed;
-    s.totalPoints++;s.scorePlayer++;
-    s.speed+=0.4;
-    s.flash=8;
-    if(s.speed>28)s.speed=28;
-    updatePongHUD(s);
+    b.vx=Math.cos(angle)*s.speed;b.vy=Math.sin(angle)*s.speed;
+    s.totalPoints++;s.scorePlayer++;s.speed+=0.4;s.flash=8;
+    if(s.speed>28)s.speed=28;updatePongHUD(s);
   }
-
-  // CPU paddle (right)
   const cx=W-PAD_W-4;
   if(b.vx>0&&b.x+BALL>=cx&&b.x-BALL<=cx+PAD_W&&b.y>=s.cpuY-PAD_H/2&&b.y<=s.cpuY+PAD_H/2){
     b.x=cx-BALL;
     const rel=(b.y-s.cpuY)/(PAD_H/2);
     const angle=rel*65*(Math.PI/180);
-    b.vx=-Math.cos(angle)*s.speed;
-    b.vy=Math.sin(angle)*s.speed;
+    b.vx=-Math.cos(angle)*s.speed;b.vy=Math.sin(angle)*s.speed;
   }
-
-  // Score
-  if(b.x+BALL<0){
-    s.scoreCpu++;
-    s.speed=Math.max(PONG.BASE_SPEED,s.speed-0.5);
-    Object.assign(s,{ball:resetBall(1)});
-    updatePongHUD(s);
-  }
-  if(b.x-BALL>W){
-    s.scorePlayer++;s.totalPoints++;s.speed+=0.4;s.flash=8;
-    if(s.speed>28)s.speed=28;
-    Object.assign(s,{ball:resetBall(-1)});
-    updatePongHUD(s);
-  }
-
-  // Draw
+  if(b.x+BALL<0){s.scoreCpu++;s.speed=Math.max(PONG.BASE_SPEED,s.speed-0.5);Object.assign(s,{ball:resetBall(1)});updatePongHUD(s);}
+  if(b.x-BALL>W){s.scorePlayer++;s.totalPoints++;s.speed+=0.4;s.flash=8;if(s.speed>28)s.speed=28;Object.assign(s,{ball:resetBall(-1)});updatePongHUD(s);}
   ctx.clearRect(0,0,W,H);
-
   if(s.flash>0){ctx.fillStyle=`rgba(229,178,93,${s.flash*0.012})`;ctx.fillRect(0,0,W,H);s.flash--;}
-
   ctx.setLineDash([6,8]);ctx.strokeStyle='rgba(74,42,56,.8)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();ctx.setLineDash([]);
-
   const trailLen=Math.min(8,Math.floor(s.speed/3));
   for(let i=trailLen;i>0;i--){
     const alpha=0.06*(trailLen-i+1)/trailLen;
     ctx.beginPath();ctx.arc(b.x-b.vx*i*0.6,b.y-b.vy*i*0.6,BALL*(0.5+i/trailLen*0.5),0,Math.PI*2);
     ctx.fillStyle=`rgba(229,178,93,${alpha})`;ctx.fill();
   }
-
-  ctx.beginPath();ctx.arc(b.x,b.y,BALL,0,Math.PI*2);
-  ctx.fillStyle='#E5B25D';ctx.fill();
-
+  ctx.beginPath();ctx.arc(b.x,b.y,BALL,0,Math.PI*2);ctx.fillStyle='#E5B25D';ctx.fill();
   const padR=4;
   roundRect(ctx,px,s.playerY-PAD_H/2,PAD_W,PAD_H,padR,'#E5B25D');
   roundRect(ctx,cx,s.cpuY-PAD_H/2,PAD_W,PAD_H,padR,'#d9534f');
-
   if(pongRunning)pongRaf=requestAnimationFrame(pongLoop);
 }
-
-function roundRect(ctx,x,y,w,h,r,color){
-  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill();
-}
-
+function roundRect(ctx,x,y,w,h,r,color){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill();}
 function updatePongHUD(s){
   document.getElementById('pong-score-player').textContent=s.scorePlayer;
   document.getElementById('pong-score-cpu').textContent=s.scoreCpu;
