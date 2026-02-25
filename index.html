@@ -387,7 +387,9 @@ input::placeholder,textarea::placeholder{color:var(--muted);}
   <div id="panel-history" class="panel">
     <div class="hist-filters">
       <select id="history-filter" onchange="renderHistory()"><option value="all">All Players</option></select>
+      <select id="history-filter-2" onchange="renderHistory()" style="display:none"><option value="all">vs Everyone</option></select>
     </div>
+    <div id="h2h-banner" style="display:none;background:var(--surface);border:1px solid var(--border);padding:.75rem 1rem;margin-bottom:1rem;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap"></div>
     <div id="history-list"><div class="loading">Loading matches</div></div>
   </div>
 
@@ -929,7 +931,7 @@ function renderLeaderboard(){
     const lastS=seasons.length?seasons[seasons.length-1]:null;
     const sBadge=lastS?(()=>{const rk=lastS.rank,cls=rk===1?'rank1':rk===2?'rank2':rk===3?'rank3':'rankN',emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';return`<span class="s-badge ${cls}" title="Last season: ${esc(lastS.seasonName||'Season '+lastS.seasonNum)}" style="font-size:.6rem;padding:.12rem .35rem">${emoji}${emoji?'':('#'+rk)}</span>`})():'';
     const no1Since=p.no1Since||null;
-    const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--accent3);margin-left:.35rem;letter-spacing:.03em">👑 —</span>`:'';
+    const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--accent3);margin-left:.5rem;letter-spacing:.04em;line-height:1">👑 0s</span>`:'';
     return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}${no1Tag}</div></td><td><span class="rating-val">${r2(p.rating)}</span></td><td><span class="rd-val">±${r2(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
   }).join('')+(sorted.length>vis.length?`<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
 }
@@ -1083,7 +1085,14 @@ function tickNo1Timers(){
   document.querySelectorAll('.no1-timer[data-since]').forEach(el=>{
     const since=parseInt(el.dataset.since);
     if(!since)return;
-    el.textContent='👑 '+fmtDur(now-since);
+    const ms=now-since;
+    const d=Math.floor(ms/864e5),h=Math.floor((ms%864e5)/36e5),m=Math.floor((ms%36e5)/6e4),s=Math.floor((ms%6e4)/1e3);
+    let label;
+    if(d>0)label=d+'d '+h+'h '+m+'m '+s+'s';
+    else if(h>0)label=h+'h '+m+'m '+s+'s';
+    else if(m>0)label=m+'m '+s+'s';
+    else label=s+'s';
+    el.textContent='👑 '+label;
   });
 }
 setInterval(tickNo1Timers,1000);
@@ -1336,11 +1345,51 @@ function renderHistoryFilter(){
   const sel=document.getElementById('history-filter'),cur=sel.value;
   sel.innerHTML='<option value="all">All Players</option>'+players.map(p=>`<option value="${p.firestoreId}">${esc(p.name)}</option>`).join('');
   sel.value=players.find(p=>p.firestoreId===cur)?cur:'all';
+  // show/hide second dropdown
+  const flt=sel.value;
+  const sel2=document.getElementById('history-filter-2');
+  if(flt!=='all'){
+    const cur2=sel2.value;
+    sel2.innerHTML='<option value="all">vs Everyone</option>'+players.filter(p=>p.firestoreId!==flt).map(p=>`<option value="${p.firestoreId}">${esc(p.name)}</option>`).join('');
+    sel2.value=players.find(p=>p.firestoreId===cur2&&p.firestoreId!==flt)?cur2:'all';
+    sel2.style.display='';
+  } else {
+    sel2.style.display='none';
+    sel2.value='all';
+  }
 }
 window.renderHistory=function(){
-  renderHistoryFilter();const flt=document.getElementById('history-filter').value,el=document.getElementById('history-list');
+  renderHistoryFilter();
+  const flt=document.getElementById('history-filter').value;
+  const flt2=document.getElementById('history-filter-2').value;
+  const el=document.getElementById('history-list');
+  const banner=document.getElementById('h2h-banner');
   const ids=new Set(players.map(p=>p.firestoreId));
-  let ms=matches.filter(m=>ids.has(m.p1id)&&ids.has(m.p2id));if(flt!=='all')ms=ms.filter(m=>m.p1id===flt||m.p2id===flt);
+  let ms=matches.filter(m=>ids.has(m.p1id)&&ids.has(m.p2id));
+  if(flt!=='all')ms=ms.filter(m=>m.p1id===flt||m.p2id===flt);
+  if(flt!=='all'&&flt2!=='all')ms=ms.filter(m=>(m.p1id===flt&&m.p2id===flt2)||(m.p1id===flt2&&m.p2id===flt));
+
+  // H2H banner
+  if(flt!=='all'&&flt2!=='all'&&ms.length){
+    const p1=players.find(p=>p.firestoreId===flt);
+    const p2=players.find(p=>p.firestoreId===flt2);
+    const p1wins=ms.filter(m=>m.winnerId===flt).length;
+    const p2wins=ms.filter(m=>m.winnerId===flt2).length;
+    const total=ms.length;
+    const leader=p1wins>p2wins?p1:p2wins>p1wins?p2:null;
+    const leaderWins=Math.max(p1wins,p2wins);
+    const loserWins=Math.min(p1wins,p2wins);
+    const headlineCol=p1wins===p2wins?'var(--accent)':'var(--win)';
+    const headline=p1wins===p2wins
+      ?`<span style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--accent);letter-spacing:.05em">TIED ${p1wins}–${p2wins}</span>`
+      :`<span style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--win);letter-spacing:.05em">${esc(leader.name)} leads ${leaderWins}–${loserWins}</span>`;
+    const sub=`<span style="font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted)">${total} match${total!==1?'es':''} played · ${esc(p1.name)} ${p1wins}W · ${esc(p2.name)} ${p2wins}W</span>`;
+    banner.style.display='flex';
+    banner.innerHTML=`<div style="display:flex;flex-direction:column;gap:.3rem">${headline}${sub}</div>`;
+  } else {
+    banner.style.display='none';
+  }
+
   if(!ms.length){el.innerHTML='<div class="empty">No matches yet.</div>';return;}
   el.innerHTML=ms.map(m=>{
     const ts=m.date?.toDate?m.date.toDate():new Date(m.date);
