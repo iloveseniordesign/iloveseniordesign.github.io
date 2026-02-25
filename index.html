@@ -59,21 +59,31 @@ main{padding:1.25rem;position:relative;z-index:1;width:100%;overflow-x:hidden;}
 /* LEADERBOARD */
 .lb-table{width:100%;border-collapse:collapse;}
 .lb-table th{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--muted);text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--border);}
-.lb-table td{padding:.7rem;border-bottom:1px solid rgba(74,42,56,.5);vertical-align:middle;}
+  color:var(--muted);text-align:left;padding:.55rem .5rem;border-bottom:1px solid var(--border);}
+.lb-table td{padding:.6rem .5rem;border-bottom:1px solid rgba(74,42,56,.5);vertical-align:middle;}
 .lb-table tr:hover td{background:rgba(229,178,93,.04);}
 .lb-table tbody tr{cursor:pointer;}
-.rank{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--muted);width:2.2rem;}
+.rank{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--muted);white-space:nowrap;}
 .rank.top1{color:var(--accent);}.rank.top2{color:#c0c0c0;}.rank.top3{color:#cd7f32;}
-.lb-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid var(--border);background:var(--surface);flex-shrink:0;}
-.lb-av-ph{width:30px;height:30px;border-radius:50%;background:var(--surface);border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.8rem;color:var(--muted);flex-shrink:0;}
-.player-name{font-size:.9rem;font-weight:600;letter-spacing:.02em;}
-.pname-cell{display:flex;align-items:center;gap:.55rem;}
-.rating-val{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--accent);letter-spacing:.05em;}
-.rd-val{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--muted);}
-.record-badge{font-family:'DM Mono',monospace;font-size:.62rem;display:inline-flex;gap:.35rem;}
+.lb-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+.lb-av-ph{width:28px;height:28px;border-radius:50%;background:var(--surface);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.75rem;color:var(--muted);flex-shrink:0;}
+.player-name{font-size:.85rem;font-weight:600;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pname-cell{display:flex;align-items:center;gap:.45rem;min-width:0;}
+.rating-val{font-family:'Bebas Neue',sans-serif;font-size:1.35rem;color:var(--accent);letter-spacing:.05em;white-space:nowrap;}
+.rd-val{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);white-space:nowrap;}
+.record-badge{font-family:'DM Mono',monospace;font-size:.6rem;display:inline-flex;gap:.3rem;white-space:nowrap;}
 .record-badge .w{color:var(--win);}.record-badge .l{color:var(--loss);}
+/* hide less important columns on small screens */
+@media(max-width:480px){
+  .lb-col-rd,.lb-col-crown{display:none;}
+  .lb-table th{padding:.5rem .35rem;}
+  .lb-table td{padding:.55rem .35rem;}
+  .rating-val{font-size:1.2rem;}
+}
+@media(min-width:481px) and (max-width:640px){
+  .lb-col-crown{display:none;}
+}
 
 /* FORMS */
 .form-card{background:var(--surface);border:1px solid var(--border);padding:1.25rem;margin-bottom:1.25rem;width:100%;}
@@ -113,7 +123,7 @@ input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{
 .hist-filters select{width:auto;min-width:150px;flex:1;}
 .match-row{background:var(--surface);border:1px solid var(--border);padding:.75rem .9rem;
   margin-bottom:.35rem;display:grid;grid-template-columns:1fr auto 1fr;grid-template-rows:auto auto;align-items:center;gap:.4rem .4rem;}
-.match-row .match-meta-col{grid-column:1/-1;font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:left;white-space:nowrap;margin-top:.1rem;}
+.match-row .match-meta-col{grid-column:1/-1;font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:left;white-space:normal;overflow-wrap:break-word;margin-top:.1rem;}
 .match-player{display:flex;flex-direction:column;gap:.15rem;}
 .match-player .name{font-weight:600;font-size:.82rem;}
 .match-player .delta{font-family:'DM Mono',monospace;font-size:.62rem;}
@@ -191,25 +201,33 @@ input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{
 
 /* PROFILE MODAL */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(5,5,10,.88);
-  backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center;padding:.75rem;}
+  backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center;padding:.4rem;}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--surface);border:1px solid var(--border);width:100%;max-width:800px;
-  max-height:92vh;overflow-y:auto;animation:mIn .2s ease;}
+  max-height:96vh;overflow-y:auto;animation:mIn .2s ease;}
 @keyframes mIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
-.modal-header{padding:1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;}
-.mh-left{display:flex;gap:.85rem;align-items:flex-start;flex:1;min-width:0;}
+.modal-header{padding:1rem;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem;}
+.mh-left{display:flex;gap:.75rem;align-items:flex-start;flex:1;min-width:0;}
 .m-av-wrap{position:relative;flex-shrink:0;}
-.m-avatar{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--border);display:block;}
-.m-av-ph{width:60px;height:60px;border-radius:50%;background:var(--bg);border:2px solid var(--border);
-  display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--muted);}
-.m-av-upload{position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;background:var(--accent);
+.m-avatar{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--border);display:block;}
+.m-av-ph{width:52px;height:52px;border-radius:50%;background:var(--bg);border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--muted);}
+.m-av-upload{position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;background:var(--accent);
   border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;
-  font-size:.7rem;color:#1e1018;border:2px solid var(--surface);font-weight:700;line-height:1;}
+  font-size:.65rem;color:#1e1018;border:2px solid var(--surface);font-weight:700;line-height:1;}
 .m-av-upload:hover{background:#f5e6cc;}
 .m-av-input{display:none;}
 .m-player-info{flex:1;min-width:0;}
-.m-player-name{font-family:'Bebas Neue',sans-serif;font-size:1.9rem;letter-spacing:.06em;color:var(--text);line-height:1;word-break:break-word;}
-.m-stats{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.4rem;}
+.m-player-name{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;letter-spacing:.06em;color:var(--text);line-height:1;word-break:break-word;}
+.m-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(85px,1fr));gap:.5rem .6rem;margin-top:.5rem;}
+@media(max-width:400px){
+  .m-avatar,.m-av-ph{width:44px;height:44px;}
+  .m-player-name{font-size:1.3rem;}
+  .m-stats{grid-template-columns:repeat(auto-fill,minmax(75px,1fr));}
+  .modal-header{padding:.75rem;}
+  .mh-left{gap:.55rem;}
+  .m-close{font-size:.55rem;padding:.28rem .5rem;}
+}
 .m-stat{display:flex;flex-direction:column;gap:.12rem;}
 .m-stat-l{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
 .m-stat-v{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--accent);line-height:1;}
@@ -245,7 +263,7 @@ input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{
 .pm-info{display:flex;flex-direction:column;gap:.12rem;min-width:0;}
 .pm-opp{font-weight:600;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pm-date{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);}
-.pm-delta{font-family:'DM Mono',monospace;font-size:.75rem;text-align:right;white-space:nowrap;}
+.pm-delta{font-family:'DM Mono',monospace;font-size:.72rem;text-align:right;white-space:nowrap;min-width:0;}
 .pm-delta.pos{color:var(--win);}.pm-delta.neg{color:var(--loss);}
 
 /* ADMIN PANEL */
@@ -374,16 +392,15 @@ input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{
   <!-- LEADERBOARD -->
   <div id="panel-leaderboard" class="panel active">
     <div id="lb-loading" class="loading">Loading leaderboard</div>
-    <table class="lb-table" id="lb-table" style="display:none;table-layout:fixed;width:100%">
-      <colgroup>
-        <col style="width:2.5rem">
-        <col><!-- player name, flexible -->
-        <col style="width:6rem">
-        <col style="width:5rem">
-        <col style="width:6rem">
-        <col style="width:9rem"><!-- crown timer, only #1 uses it -->
-      </colgroup>
-      <thead><tr><th>#</th><th>Player</th><th>Rating</th><th>RD</th><th>W–L</th><th></th></tr></thead>
+    <table class="lb-table" id="lb-table" style="display:none">
+      <thead><tr>
+        <th class="lb-col-rank">#</th>
+        <th>Player</th>
+        <th class="lb-col-rating">Rating</th>
+        <th class="lb-col-rd">RD</th>
+        <th class="lb-col-wl">W–L</th>
+        <th class="lb-col-crown"></th>
+      </tr></thead>
       <tbody id="lb-body"></tbody>
     </table>
     <div id="lb-empty" class="empty" style="display:none">No players yet.</div>
@@ -532,6 +549,28 @@ input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{
           <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Recalculates every player's rating, RD, and volatility directly from their last stored match result, then applies any accumulated decay since that match. Use this to fix any players whose values were incorrectly reset.</p>
           <button class="btn-admin" onclick="repairAllRatings()" style="font-size:.68rem;padding:.65rem 1.2rem">🔧 Repair All Ratings From Match History</button>
           <div class="msg" id="repair-msg" style="margin-top:.65rem"></div>
+        </div>
+      </div>
+
+      <div class="admin-section" style="max-width:480px">
+        <div class="admin-stitle">Deduplicate Matches</div>
+        <div class="form-card" style="border-color:rgba(217,83,79,.3)">
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Scans the match log for duplicate entries (same two players, same winner, same minute). Keeps exactly one copy of each match and deletes the rest. Run <strong style="color:var(--text)">Repair All Ratings</strong> afterward to fix any rating drift.</p>
+          <div id="dedup-preview" style="display:none;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);line-height:1.8;padding:.55rem .75rem;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:.9rem"></div>
+          <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+            <button class="btn-admin" onclick="previewDedup()" style="font-size:.68rem;padding:.65rem 1.2rem">🔍 Preview Duplicates</button>
+            <button class="btn-danger" id="dedup-btn" onclick="runDedup()" style="padding:.65rem 1.2rem;font-size:.65rem;display:none">🗑 Delete Duplicates</button>
+          </div>
+          <div class="msg" id="dedup-msg" style="margin-top:.65rem"></div>
+        </div>
+      </div>
+
+      <div class="admin-section" style="max-width:480px">
+        <div class="admin-stitle">Fix Match Sides</div>
+        <div class="form-card" style="border-color:rgba(217,83,79,.3)">
+          <p style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:.9rem;line-height:1.6">Fixes matches where p1/p2 sides got swapped during a restore — causing LOSSes to show positive rating changes. Ensures <strong style="color:var(--text)">p1 always = winner</strong> in every match record. Run <strong style="color:var(--text)">Repair All Ratings</strong> after.</p>
+          <button class="btn-admin" onclick="fixMatchSides()" id="fix-sides-btn" style="font-size:.68rem;padding:.65rem 1.2rem">🔀 Fix Match Sides</button>
+          <div class="msg" id="fix-sides-msg" style="margin-top:.65rem"></div>
         </div>
       </div>
 
@@ -1097,7 +1136,7 @@ function renderLeaderboard(){
     const sBadge=lastS?(()=>{const rk=lastS.rank,cls=rk===1?'rank1':rk===2?'rank2':rk===3?'rank3':'rankN',emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';return`<span class="s-badge ${cls}" title="Last season: ${esc(lastS.seasonName||'Season '+lastS.seasonNum)}" style="font-size:.6rem;padding:.12rem .35rem">${emoji}${emoji?'':('#'+rk)}</span>`})():'';
     const no1Since=p.no1Since||null;
     const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'Bebas Neue',sans-serif;font-size:1.05rem;color:var(--accent3);letter-spacing:.04em;line-height:1;white-space:nowrap;">👑 0s</span>`:'';
-    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}</div></td><td><span class="rating-val">${r2(p.rating)}</span></td><td><span class="rd-val">±${r2(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td><td style="white-space:nowrap">${no1Tag}</td></tr>`;
+    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc} lb-col-rank">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}</div></td><td class="lb-col-rating"><span class="rating-val">${r2(p.rating)}</span></td><td class="lb-col-rd"><span class="rd-val">±${r2(p.rd)}</span></td><td class="lb-col-wl"><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td><td class="lb-col-crown">${no1Tag}</td></tr>`;
   }).join('')+(sorted.length>vis.length?`<tr><td colspan="6" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
 }
 
@@ -1458,46 +1497,47 @@ window.restoreSeason=async function(){
       playerSeasonData.push({player:p,entry,smDoc});
     }
 
-    // 2. Build a unified match list from archived seasonMatches data
-    // Each player's smDoc.matches has: {opponent, won, date, oldRating, newRating, delta, matchScore}
-    // We need to reconstruct full match records (both players). We'll dedupe by pairing.
-    // Strategy: collect all matches, group by approximate timestamp+players to dedupe.
-    const rawMatches=[]; // {winnerId, loserId, winnerName, loserName, p1id, p2id, p1name, p2name, date, matchScore, p1oldRating, p1newRating, p1delta, p2oldRating, p2newRating, p2delta, score}
-    const seenPairs=new Set();
+    // 2. Build match list — iterate ONLY won:true entries so each match is processed exactly once
+    //    from the winner's perspective. This guarantees:
+    //      - exactly n/2 matches written (n = total entries across all player profiles)
+    //      - p1 always = winner, matching how submitMatch writes records
+    //      - no side-swapping, no minute-truncation false-deduplication
+    const rawMatches=[];
+    const seenKeys=new Set();
 
-    for(const{player,entry,smDoc}of playerSeasonData){
+    for(const{player,smDoc}of playerSeasonData){
       if(!smDoc?.matches)continue;
-      const pid=player.firestoreId;
+      const winnerId=player.firestoreId;
       for(const m of smDoc.matches){
-        // Find opponent player object
+        if(!m.won)continue; // loser's copy — skip; the winner's copy covers this match
+
         const opp=players.find(x=>x.name===m.opponent);
         if(!opp)continue;
-        const oppId=opp.firestoreId;
-        // Create a stable pair key (sorted ids + date)
+        const loserId=opp.firestoreId;
+
+        // Exact date string as key — no truncation so same-minute different matches aren't merged
         const dateStr=m.date||'';
-        const pairKey=[pid,oppId].sort().join('|')+'|'+dateStr.slice(0,16); // minute precision
-        if(seenPairs.has(pairKey))continue;
-        seenPairs.add(pairKey);
-        const winnerId=m.won?pid:oppId;
-        const loserId=m.won?oppId:pid;
-        const winnerName=m.won?player.name:opp.name;
-        const loserName=m.won?opp.name:player.name;
-        // Get opponent's perspective from their smDoc
-        const oppData=playerSeasonData.find(x=>x.player.firestoreId===oppId);
-        const oppMatch=oppData?.smDoc?.matches?.find(om=>
-          om.opponent===player.name&&om.date?.slice(0,16)===dateStr?.slice(0,16)
+        const key=`${winnerId}|${loserId}|${dateStr}`;
+        if(seenKeys.has(key))continue; // true duplicate (same winner, loser, exact timestamp)
+        seenKeys.add(key);
+
+        // Pull loser's perspective to fill in p2 rating data
+        const loserData=playerSeasonData.find(x=>x.player.firestoreId===loserId);
+        const loserMatch=loserData?.smDoc?.matches?.find(lm=>
+          lm.opponent===player.name && lm.date===dateStr && !lm.won
         );
-        const p1id=pid, p2id=oppId;
-        const p1won=m.won;
+
         rawMatches.push({
-          winnerId,loserId,winnerName,loserName,
-          p1id,p2id,p1name:player.name,p2name:opp.name,
-          score:p1won?1:0,
-          matchScore:m.matchScore||oppMatch?.matchScore||null,
-          date:new Date(dateStr),
-          p1oldRating:m.oldRating,p1newRating:m.newRating,p1delta:m.delta,
-          p2oldRating:oppMatch?.oldRating??null,p2newRating:oppMatch?.newRating??null,p2delta:oppMatch?.delta??null,
-          p1newRD:null,p1newSigma:null,p2newRD:null,p2newSigma:null,
+          winnerId, loserId,
+          winnerName: player.name, loserName: opp.name,
+          p1id: winnerId, p2id: loserId,
+          p1name: player.name, p2name: opp.name,
+          score: 1,
+          matchScore: m.matchScore||loserMatch?.matchScore||null,
+          date: new Date(dateStr),
+          p1oldRating: m.oldRating,   p1newRating: m.newRating,   p1delta: m.delta,
+          p2oldRating: loserMatch?.oldRating??null, p2newRating: loserMatch?.newRating??null, p2delta: loserMatch?.delta??null,
+          p1newRD: null, p1newSigma: null, p2newRD: null, p2newSigma: null,
         });
       }
     }
@@ -1551,6 +1591,112 @@ window.restoreSeason=async function(){
   }
 };
 
+// ── DEDUPLICATE MATCHES ───────────────────────────────────────────────────────
+function buildDedupGroups(allMatches){
+  const groups={};
+  for(const m of allMatches){
+    const ts=m.date?.toDate?m.date.toDate():new Date(m.date);
+    const minute=Math.floor(ts.getTime()/60000);
+    const pair=[m.p1id,m.p2id].sort().join('|');
+    const key=`${pair}|${m.winnerId}|${minute}`;
+    if(!groups[key])groups[key]=[];
+    groups[key].push(m);
+  }
+  return Object.values(groups).filter(g=>g.length>1);
+}
+
+window.previewDedup=async function(){
+  const prev=document.getElementById('dedup-preview');
+  const btn=document.getElementById('dedup-btn');
+  prev.style.display='none';btn.style.display='none';
+  try{
+    const snap=await getDocs(query(collection(db,'matches'),orderBy('date','asc')));
+    const allMatches=snap.docs.map(d=>({firestoreId:d.id,...d.data()}));
+    const dupGroups=buildDedupGroups(allMatches);
+    const toDelete=dupGroups.flatMap(g=>{
+      // Keep the one with the most complete data (has p1newRD), delete the rest
+      const sorted=[...g].sort((a,b)=>(b.p1newRD!=null?1:0)-(a.p1newRD!=null?1:0));
+      return sorted.slice(1);
+    });
+    if(!toDelete.length){
+      prev.style.display='block';prev.innerHTML='✅ No duplicates found — match log looks clean.';
+      return;
+    }
+    const lines=dupGroups.map(g=>{
+      const ts=g[0].date?.toDate?g[0].date.toDate():new Date(g[0].date);
+      const ds=ts.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      const ti=ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      return`<strong style="color:var(--text)">${esc(g[0].winnerName)}</strong> beat <strong style="color:var(--text)">${esc(g[0].loserName)}</strong> · ${ds} ${ti} · <span style="color:var(--loss)">${g.length-1} duplicate(s)</span>`;
+    }).join('<br>');
+    prev.style.display='block';
+    prev.innerHTML=`Found <strong style="color:var(--loss)">${toDelete.length} duplicate doc(s)</strong> across ${dupGroups.length} match(es) out of ${allMatches.length} total.<br><br>${lines}`;
+    btn.style.display='';
+  }catch(e){showMsg('dedup-msg','Error: '+e.message,true);}
+};
+
+window.runDedup=async function(){
+  const btn=document.getElementById('dedup-btn');
+  if(!confirm('Delete all duplicate match entries? This cannot be undone. Run "Repair All Ratings" afterward.'))return;
+  btn.disabled=true;btn.textContent='Deleting…';
+  try{
+    const snap=await getDocs(query(collection(db,'matches'),orderBy('date','asc')));
+    const allMatches=snap.docs.map(d=>({firestoreId:d.id,...d.data()}));
+    const dupGroups=buildDedupGroups(allMatches);
+    const toDelete=dupGroups.flatMap(g=>{
+      const sorted=[...g].sort((a,b)=>(b.p1newRD!=null?1:0)-(a.p1newRD!=null?1:0));
+      return sorted.slice(1);
+    });
+    if(!toDelete.length){showMsg('dedup-msg','No duplicates found.',false);btn.style.display='none';return;}
+    await Promise.all(toDelete.map(m=>deleteDoc(doc(db,'matches',m.firestoreId))));
+    showMsg('dedup-msg',`✅ Deleted ${toDelete.length} duplicate(s). ${allMatches.length-toDelete.length} match(es) remain. Run Repair All Ratings now.`);
+    document.getElementById('dedup-preview').style.display='none';
+    btn.style.display='none';
+  }catch(e){showMsg('dedup-msg','Error: '+e.message,true);}
+  finally{btn.disabled=false;btn.textContent='🗑 Delete Duplicates';}
+};
+
+window.fixMatchSides=async function(){
+  const btn=document.getElementById('fix-sides-btn');
+  btn.disabled=true;btn.textContent='Scanning…';
+  try{
+    const snap=await getDocs(query(collection(db,'matches'),orderBy('date','asc')));
+    const allMatches=snap.docs.map(d=>({firestoreId:d.id,...d.data()}));
+
+    const fixes=[];
+    for(const m of allMatches){
+      // In a correct match record: p1id === winnerId and score === 1
+      // If p1id !== winnerId, sides are swapped — fix by swapping all p1/p2 fields
+      if(m.p1id && m.winnerId && m.p1id !== m.winnerId){
+        fixes.push(updateDoc(doc(db,'matches',m.firestoreId),{
+          // Swap ids and names
+          p1id: m.p2id,       p2id: m.p1id,
+          p1name: m.p2name,   p2name: m.p1name,
+          // Swap rating data
+          p1oldRating: m.p2oldRating,   p2oldRating: m.p1oldRating,
+          p1newRating: m.p2newRating,   p2newRating: m.p1newRating,
+          p1delta: m.p2delta,           p2delta: m.p1delta,
+          p1newRD: m.p2newRD,           p2newRD: m.p1newRD,
+          p1newSigma: m.p2newSigma,     p2newSigma: m.p1newSigma,
+          // score is always 1 (p1 wins) in this system
+          score: 1,
+        }));
+      }
+    }
+
+    if(!fixes.length){
+      showMsg('fix-sides-msg',`✅ All ${allMatches.length} matches already have correct sides — nothing to fix.`);
+      return;
+    }
+
+    await Promise.all(fixes);
+    showMsg('fix-sides-msg',`✅ Fixed ${fixes.length} match(es). Now run Repair All Ratings to recalculate rating deltas.`);
+  }catch(e){
+    showMsg('fix-sides-msg','Error: '+e.message,true);
+    console.error(e);
+  }finally{
+    btn.disabled=false;btn.textContent='🔀 Fix Match Sides';
+  }
+};
 
 function lockMatchForm(locked){
   const btn=document.getElementById('submit-match-btn');
