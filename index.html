@@ -374,8 +374,16 @@ input:not([type=checkbox]):not([type=radio])::placeholder,textarea::placeholder{
   <!-- LEADERBOARD -->
   <div id="panel-leaderboard" class="panel active">
     <div id="lb-loading" class="loading">Loading leaderboard</div>
-    <table class="lb-table" id="lb-table" style="display:none">
-      <thead><tr><th>#</th><th>Player</th><th>Rating</th><th>RD</th><th>W–L</th></tr></thead>
+    <table class="lb-table" id="lb-table" style="display:none;table-layout:fixed;width:100%">
+      <colgroup>
+        <col style="width:2.5rem">
+        <col><!-- player name, flexible -->
+        <col style="width:6rem">
+        <col style="width:5rem">
+        <col style="width:6rem">
+        <col style="width:9rem"><!-- crown timer, only #1 uses it -->
+      </colgroup>
+      <thead><tr><th>#</th><th>Player</th><th>Rating</th><th>RD</th><th>W–L</th><th></th></tr></thead>
       <tbody id="lb-body"></tbody>
     </table>
     <div id="lb-empty" class="empty" style="display:none">No players yet.</div>
@@ -875,6 +883,7 @@ window.openAdminLogin=function(){
     if(lbl)lbl.textContent=' Admin';
     document.getElementById('admin-btn').classList.remove('on');
     document.getElementById('admin-tab-btn').style.display='none';
+    renderPastTournaments();
     showPanel('leaderboard',document.querySelector('nav button'));return;
   }
   document.getElementById('admin-pw').value='';document.getElementById('admin-login-msg').style.display='none';
@@ -888,7 +897,7 @@ window.submitAdminLogin=function(){
     if(lbl)lbl.textContent=' Logout';
     document.getElementById('admin-btn').classList.add('on');
     document.getElementById('admin-tab-btn').style.display='';
-    renderAdminPanel();
+    renderAdminPanel();renderPastTournaments();
   }else{const m=document.getElementById('admin-login-msg');m.textContent='Incorrect password.';m.className='msg err';m.style.display='block';}
 };
 
@@ -1071,9 +1080,9 @@ function renderLeaderboard(){
     const lastS=seasons.length?seasons[seasons.length-1]:null;
     const sBadge=lastS?(()=>{const rk=lastS.rank,cls=rk===1?'rank1':rk===2?'rank2':rk===3?'rank3':'rankN',emoji=rk===1?'🥇':rk===2?'🥈':rk===3?'🥉':'';return`<span class="s-badge ${cls}" title="Last season: ${esc(lastS.seasonName||'Season '+lastS.seasonNum)}" style="font-size:.6rem;padding:.12rem .35rem">${emoji}${emoji?'':('#'+rk)}</span>`})():'';
     const no1Since=p.no1Since||null;
-    const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--accent3);margin-left:.5rem;letter-spacing:.04em;line-height:1;display:inline-block;min-width:12ch;overflow:hidden">👑 0s</span>`:'';
-    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}${no1Tag}</div></td><td><span class="rating-val">${r2(p.rating)}</span></td><td><span class="rd-val">±${r2(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td></tr>`;
-  }).join('')+(sorted.length>vis.length?`<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
+    const no1Tag=i===0?`<span class="no1-timer" data-since="${no1Since||Date.now()}" style="font-family:'Bebas Neue',sans-serif;font-size:1.05rem;color:var(--accent3);letter-spacing:.04em;line-height:1;white-space:nowrap;">👑 0s</span>`:'';
+    return`<tr onclick="window.openProfile('${p.firestoreId}')"><td class="rank ${rc}">${i+1}</td><td><div class="pname-cell">${av}<span class="player-name">${esc(p.name)}</span>${sBadge}</div></td><td><span class="rating-val">${r2(p.rating)}</span></td><td><span class="rd-val">±${r2(p.rd)}</span></td><td><span class="record-badge"><span class="w">${p.wins}W</span><span class="l">${p.losses}L</span></span></td><td style="white-space:nowrap">${no1Tag}</td></tr>`;
+  }).join('')+(sorted.length>vis.length?`<tr><td colspan="6" style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:.55rem .7rem;text-align:center">${sorted.length-vis.length} hidden (RD>100)</td></tr>`:'');
 }
 
 // ── PLAYERS ──────────────────────────────────────────────────────────────────
@@ -2632,15 +2641,22 @@ window.brSaveTournament=function(bi){
   if(!b||!isBrComplete(b))return;
   if(!confirm(`Save "${b.name}" to Past Tournaments? It will no longer be editable.`))return;
 
-  // Find champion
-  let champ='';
+  // Find champion (1st place)
+  let p1='',p2='',p3='';
   if(b.format==='double'){
     const gr=b.grandReset?.matches[0];const gf=b.grand?.matches[0];
-    if(gr&&gr.w!=null)champ=gr.w===0?gr.p1:gr.p2;
-    else if(gf&&gf.w!=null)champ=gf.w===0?gf.p1:gf.p2;
+    const finalMatch=gr&&gr.w!=null?gr:gf;
+    if(finalMatch&&finalMatch.w!=null){
+      p1=finalMatch.w===0?finalMatch.p1:finalMatch.p2;
+      p2=finalMatch.w===0?finalMatch.p2:finalMatch.p1;
+    }
+    // 3rd = loser of last losers round final
+    const lastL=b.lRounds[b.lRounds.length-1];
+    const lFinal=lastL?.matches[0];
+    if(lFinal&&lFinal.w!=null)p3=lFinal.w===0?lFinal.p2:lFinal.p1;
   } else {
     const lastR=b.wRounds[b.wRounds.length-1];const fm=lastR?.matches[0];
-    if(fm&&fm.w!=null)champ=fm.w===0?fm.p1:fm.p2;
+    if(fm&&fm.w!=null)p1=fm.w===0?fm.p1:fm.p2;
   }
 
   // Build match history for display
@@ -2660,7 +2676,7 @@ window.brSaveTournament=function(bi){
 
   const pastEntry={
     id:b.id,name:b.name,format:b.format,seeding:b.seeding,
-    players:b.players,champion:champ,
+    players:b.players,champion:p1,second:p2,third:p3,
     savedAt:Date.now(),createdAt:b.createdAt,
     matchLog
   };
@@ -2775,23 +2791,33 @@ function renderPastTournaments(){
   el.innerHTML=pastTournaments.map((t,ti)=>{
     const date=new Date(t.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     const fmt=t.format==='double'?'Double Elim':'Single Elim';
-    // Group matchLog by round
-    const rounds=[...new Set(t.matchLog.map(m=>m.round))];
-    const roundsHtml=rounds.map(r=>{
-      const ms=t.matchLog.filter(m=>m.round===r);
-      return`<div style="margin-bottom:.75rem">
-        <div style="font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem">${esc(r)}</div>
-        ${ms.map(m=>{
-          const sc=m.sc1!=null&&m.sc2!=null?`<span style="color:var(--muted);font-family:'DM Mono',monospace;font-size:.58rem"> ${m.sc1}–${m.sc2}</span>`:'';
-          const w1=m.w===0,w2=m.w===1;
-          return`<div style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0;border-bottom:1px solid rgba(74,42,56,.3);font-size:.75rem;">
-            <span style="color:${w1?'var(--accent)':'var(--muted)'};font-weight:${w1?'600':'400'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w1?'🏆 ':''}${esc(m.p1)}</span>
-            <span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);flex-shrink:0;white-space:nowrap">${m.sc1!=null&&m.sc2!=null?`${m.sc1}–${m.sc2}`:'vs'}</span>
-            <span style="color:${w2?'var(--accent)':'var(--muted)'};font-weight:${w2?'600':'400'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right">${w2?'🏆 ':''}${esc(m.p2)}</span>
-          </div>`;
-        }).join('')}
+    const isDouble=t.format==='double';
+
+    let resultsHtml='';
+    if(isDouble){
+      // Podium: 1st, 2nd, 3rd
+      const podium=[
+        {place:'1st',emoji:'🥇',name:t.champion||'—',color:'var(--accent)'},
+        {place:'2nd',emoji:'🥈',name:t.second||'—',color:'#c0c0c0'},
+        {place:'3rd',emoji:'🥉',name:t.third||'—',color:'#cd7f32'},
+      ];
+      resultsHtml=`<div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem">
+        ${podium.map(p=>`<div style="flex:1;min-width:120px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:3px;padding:.6rem .8rem;">
+          <div style="font-family:'DM Mono',monospace;font-size:.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.25rem">${p.place}</div>
+          <div style="font-size:1.1rem;line-height:1">${p.emoji}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.05em;color:${p.color};margin-top:.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</div>
+        </div>`).join('')}
       </div>`;
-    }).join('');
+    } else {
+      // Single elim: just the winner
+      resultsHtml=t.champion?`<div style="display:flex;align-items:center;gap:.6rem;padding:.5rem 0">
+        <span style="font-size:1.3rem">🏆</span>
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Winner</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.15rem;letter-spacing:.05em;color:var(--accent)">${esc(t.champion)}</div>
+        </div>
+      </div>`:'';
+    }
 
     return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;margin-bottom:1rem;overflow:hidden;">
       <!-- Header -->
@@ -2808,9 +2834,7 @@ function renderPastTournaments(){
       </div>
       <!-- Collapsible body -->
       <div id="pt-body-${ti}" style="display:none;padding:1rem;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
-          ${roundsHtml}
-        </div>
+        ${resultsHtml}
         ${isAdmin?`<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border);text-align:right"><button class="btn-danger" style="font-size:.54rem" onclick="deletePastTournament(${ti})">Delete from history</button></div>`:''}
       </div>
     </div>`;
